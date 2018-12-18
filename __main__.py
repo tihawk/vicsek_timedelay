@@ -19,26 +19,29 @@ eta = 0.45
 r = 1.
 
 # time step
-t = 0.
+t = 0
 delta_t = 1
 
 # size of system
 box_size = 7.5
 
 # maximum time steps
-T = 200.*delta_t
+T = 10000*delta_t
 
 # velocity of particles
 vel = 0.05
 
 # are we running for static correlation (true) or spattemp corr (false)
-isStatic = True
+isStatic = False
 
 # wavenumber for calculating the spattemp correlation
 corrCalcK = 0.704
 
 # the length of the dataset for the spattemp correlation (in units of time)
-timeLength = 20
+timeLength = 200
+
+# the time at which to start the spattemp corr calculations (in ratio of T)
+corrCalcStart = 0.1*T
 """END Sim Vars"""
 
 """INITIALISE"""
@@ -59,7 +62,7 @@ counter = 0
 timestepTime = time.time()
 
 #init spattempcorr
-spatTempCorr = np.zeros(shape=(timeLength, T/(timeLength*2)))
+spatTempCorr = np.zeros(shape=(timeLength, (T - corrCalcStart)/(timeLength)))
 corrIndex = [0, 0]
 """END INIT"""
 
@@ -97,12 +100,12 @@ while t < T:
     # repeated. Later those will be averaged out.
     if(isStatic is not True):
         # get time zero vars for spattempcorr
-        if t == (0.5*T - delta_t):
+        if t == (corrCalcStart - delta_t):
             print("Here we go")
             time_zero(particles, rand_vecs, t)
             statCorrNormalisation = static_correlation(rand_vecs, particles, [corrCalcK])
             
-        if t >= 0.5*T:
+        if t >= corrCalcStart:
             # this construction will build up a few data sets of a set time length, which will be later averaged out            
             if( corrIndex[0] < len(spatTempCorr[0]) ):
                 if( corrIndex[1] < len(spatTempCorr) ):
@@ -129,12 +132,16 @@ while t < T:
     
         # get noise vector
         noise = np.random.uniform(0, eta) * rand_vector()
-        new_dir = ( (avg + noise) / np.sqrt(np.dot(avg + noise, avg + noise)) )
+        
+        # calculate the new unit vector for the particle, taking into account
+        # the noise, and of course - normalisation
+        avgAndNoise = avg + noise
+        new_dir = ( (avgAndNoise) / np.sqrt(np.dot(avgAndNoise, avgAndNoise)) )
     
         # move to new position 
         particles[i,:] += delta_t * vel * new_dir
     
-        # get new angle vector
+        # get new unit vector vector
         rand_vecs[i] = new_dir
     
         # assure correct boundaries (xmax,ymax) = (box_size, box_size)
@@ -182,11 +189,9 @@ else:
         np.savetxt(f,output)
         f.close()
         
-        plt.subplot(2, 1, 1)
         plt.plot(wavenums, statCorrTimeAvg)
-        plt.subplot(2, 1, 2)
-        plt.plot(range(len(polarisation)), polarisation)
         plt.show()
+        plt.plot(range(len(polarisation)), polarisation)
     """END STATCORR"""
     
     """HEREAFTER WE CARE ABOUT THE SPATIO-TEMPORAL CORRELATION"""
