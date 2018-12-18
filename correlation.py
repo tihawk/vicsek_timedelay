@@ -1,8 +1,5 @@
 import numpy as np
 from scipy.spatial.distance import cdist
-from geometry3d import *
-from neighbor import *
-import matplotlib.pyplot as plt
 
 polarisation = []
 particles_t0 = []

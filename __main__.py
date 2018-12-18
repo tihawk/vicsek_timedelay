@@ -1,16 +1,14 @@
 #!/usr/bin/python
 import numpy as np
-from geometry3d import *
-from neighbor import *
-from correlation import *
-from susceptibility import *
-import sys
+from geometry3d import rand_vector, get_all_distances
+from neighbour import get_neighbours, get_average
+from correlation import static_correlation, spattemp_correlation, time_zero, polarisation
+from susceptibility import susceptibility, criticality_x
 import time
 import matplotlib.pyplot as plt
 
-"""INITIALISE"""
-
 """Simulation Variables"""
+# Set these before running!!!
 # number of particles
 N = 128
 
@@ -33,13 +31,17 @@ T = 20000.*delta_t
 # velocity of particles
 vel = 0.05
 
+# are we running for static correlation (true) or spattemp corr (false)
+isStatic = False
+
 # wavenumber for calculating the spattemp correlation
 corrCalcK = 0.704
 
-# are we running for static correlation (true) or spattemp corr (false)
-isStatic = False
+# the length of the dataset for the spattemp correlation (in units of time)
+timeLength = 200
 """END Sim Vars"""
 
+"""INITIALISE"""
 particles = np.random.uniform(0,box_size,size=(N,3))
 
 # initialize random angles in 3D
@@ -56,9 +58,6 @@ counter = 0
 timestepTime = time.time()
 
 #init spattempcorr
-"""DON'T FORGET TO SET THIS ONE:"""
-# the length of the dataset for the spattemp correlation (in units of time)
-timeLength = 200
 spatTempCorr = np.zeros(shape=(timeLength, T/(timeLength*2)))
 corrIndex = [0, 0]
 """END INIT"""
@@ -112,7 +111,7 @@ while t < T:
     """Timestep"""
     for i, (x, y, z) in enumerate(particles):
         # get neighbor indices for current particle
-        neighbours = get_neighbors(distances, r, i)
+        neighbours = get_neighbours(distances, r, i)
     
         # get average theta vector
         avg = get_average(rand_vecs, neighbours)

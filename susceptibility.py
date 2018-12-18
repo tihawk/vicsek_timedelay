@@ -1,7 +1,4 @@
 import numpy as np
-from geometry3d import *
-from neighbor import *
-import matplotlib.pyplot as plt
 
 def susceptibility(statCorr):
     return np.max(statCorr)
