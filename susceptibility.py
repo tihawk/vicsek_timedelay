@@ -1,8 +1,10 @@
 import numpy as np
 
+# get susceptibility defined as the maximum of the static correlation function
 def susceptibility(statCorr):
     return np.max(statCorr)
     
+# get nearest neighbour distances at time t
 def criticality_x(distances, r):
     nearest = np.zeros(len(distances[0]))
     

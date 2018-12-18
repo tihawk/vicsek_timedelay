@@ -26,25 +26,26 @@ delta_t = 1
 box_size = 7.5
 
 # maximum time steps
-T = 20000.*delta_t
+T = 200.*delta_t
 
 # velocity of particles
 vel = 0.05
 
 # are we running for static correlation (true) or spattemp corr (false)
-isStatic = False
+isStatic = True
 
 # wavenumber for calculating the spattemp correlation
 corrCalcK = 0.704
 
 # the length of the dataset for the spattemp correlation (in units of time)
-timeLength = 200
+timeLength = 20
 """END Sim Vars"""
 
 """INITIALISE"""
+# initialise random particle positions
 particles = np.random.uniform(0,box_size,size=(N,3))
 
-# initialize random angles in 3D
+# initialise random unit vectors in 3D
 rand_vecs = np.zeros((N,3))
 for i in range(0,N):
     vec = rand_vector()
@@ -65,6 +66,7 @@ corrIndex = [0, 0]
 """TIMESTEP AND THINGS TO DO WHEN VISITING"""    
 # Run until time ends
 while t < T:
+    # print progress update and time spent on n steps
     if t%10 == 0:
         print ("step {}. time for 10 steps {}".format(t, time.time()-timestepTime))
         timestepTime = time.time()
@@ -73,6 +75,10 @@ while t < T:
     distances = get_all_distances(particles)
     
     """StatCorr"""
+    # in the last 10% of the simulation time, start calculating the static
+    # correlation function at time t for a range of wavenumbers, in order to
+    # build up an average. Meanwhile get the nearest neighbour distance at
+    # time t. Later that will be averaged out as well.
     if(isStatic):
         if t >= (T - 0.1*T):
             start = time.time()
@@ -85,6 +91,10 @@ while t < T:
             print("cereal calc time: {}".format(time.time()-start))
        
     """SpatTempCorr"""
+    # after a certain amount of steps (i.e. 50%), start calculating the spatio-
+    # temporal correlation function. That will be calculated for a certain
+    # amount of steps, after which a new dataset will be created, and the process
+    # repeated. Later those will be averaged out.
     if(isStatic is not True):
         # get time zero vars for spattempcorr
         if t == (0.5*T - delta_t):
@@ -109,6 +119,7 @@ while t < T:
     ## save coordinates & angle vectors
     #output = np.concatenate((particles,rand_vecs),axis=1)
     """Timestep"""
+    # actual simulation timestep
     for i, (x, y, z) in enumerate(particles):
         # get neighbor indices for current particle
         neighbours = get_neighbours(distances, r, i)
@@ -150,6 +161,10 @@ while t < T:
     
 else:
     """HEREAFTER WE CARE ABOUT THE STATIC CORRELATION"""
+    # here the data from the static correlation will be averaged, saved and plotted.
+    # the susceptibility (defined as the maximum of the static correlation) and
+    # nearest neighbour distance, will be averaged, saved and printed as well.
+    # the polarisation will be printed as well
     if(isStatic):
         statCorrTimeAvg = statCorrTimeAvg / counter
         
@@ -175,6 +190,8 @@ else:
     """END STATCORR"""
     
     """HEREAFTER WE CARE ABOUT THE SPATIO-TEMPORAL CORRELATION"""
+    # here the data for the spatio-temporal correlation will be averaged, saved and plotted.
+    # the polarisation will be printed as well
     if(isStatic is not True):
         #plt.plot(range(len(spatTempCorr)), spatTempCorr)
         
