@@ -3,15 +3,16 @@ import numpy as np
 from geometry3d import *
 from neighbor import *
 from correlation import *
-from spattempcorr import *
 from susceptibility import *
 import sys
 import time
 import matplotlib.pyplot as plt
 
-"""VARS IF RAN MANUALLY"""
+"""INITIALISE"""
+
+"""Simulation Variables"""
 # number of particles
-N = 1024
+N = 128
 
 # noise intensity
 eta = 0.45
@@ -24,36 +25,21 @@ t = 0.
 delta_t = 1
 
 # size of system
-box_size = 14.
+box_size = 7.5
 
 # maximum time steps
-T = 200000.*delta_t
+T = 20000.*delta_t
+
+# velocity of particles
 vel = 0.05
 
-corrCalcK = 0.397
+# wavenumber for calculating the spattemp correlation
+corrCalcK = 0.704
 
-"""VARS IF RAN FROM SCRIPT"""
-## number of particles
-#N = int(sys.argv[1])
-#
-## noise intensity
-#eta = float(sys.argv[2])
-#
-## neighbor radius
-#r = float(sys.argv[3])
-#
-## time step
-#delta_t = 1
-#
-## size of system
-#box_size = float(sys.argv[4])
+# are we running for static correlation (true) or spattemp corr (false)
+isStatic = False
+"""END Sim Vars"""
 
-# maximum time steps
-#T = float(sys.argv[5])*delta_t
-
-# Generate random particle coordinations
-# particles[i,0] = x
-# particles[i,1] = y
 particles = np.random.uniform(0,box_size,size=(N,3))
 
 # initialize random angles in 3D
@@ -70,33 +56,37 @@ counter = 0
 timestepTime = time.time()
 
 #init spattempcorr
+"""DON'T FORGET TO SET THIS ONE:"""
+# the length of the dataset for the spattemp correlation (in units of time)
 timeLength = 200
 spatTempCorr = np.zeros(shape=(timeLength, T/(timeLength*2)))
 corrIndex = [0, 0]
-    
-if __name__ == "__main__":
-    
-    # Run until time ends
-    while t < T:
-        if t%10 == 0:
-            print ("step {}. time for 10 steps {}".format(t, time.time()-timestepTime))
-            timestepTime = time.time()
-            
-        # get all relative distances between particles before looking for neighbours
-        distances = get_all_distances(particles)
+"""END INIT"""
+
+"""TIMESTEP AND THINGS TO DO WHEN VISITING"""    
+# Run until time ends
+while t < T:
+    if t%10 == 0:
+        print ("step {}. time for 10 steps {}".format(t, time.time()-timestepTime))
+        timestepTime = time.time()
         
-        """StatCorr"""
-#        if t >= (T - 0.1*T):
-#            start = time.time()
+    # get all relative distances between particles before looking for neighbours
+    distances = get_all_distances(particles)
+    
+    """StatCorr"""
+    if(isStatic):
+        if t >= (T - 0.1*T):
+            start = time.time()
+        
+            data = static_correlation(rand_vecs, particles, wavenums)
             
-#            data = static_correlation(rand_vecs, particles, wavenums)
-#            
-#            statCorrTimeAvg += data
-#            counter = counter + 1
-#            critX += criticality_x(distances, r)
-#            print("cereal calc time: {}".format(time.time()-start))
-           
-        """SpatTempCorr"""
+            statCorrTimeAvg += data
+            counter = counter + 1
+            critX += criticality_x(distances, r)
+            print("cereal calc time: {}".format(time.time()-start))
+       
+    """SpatTempCorr"""
+    if(isStatic is not True):
         # get time zero vars for spattempcorr
         if t == (0.5*T - delta_t):
             print("Here we go")
@@ -104,8 +94,7 @@ if __name__ == "__main__":
             statCorrNormalisation = static_correlation(rand_vecs, particles, [corrCalcK])
             
         if t >= 0.5*T:
-            #start = time.time()
-            
+            # this construction will build up a few data sets of a set time length, which will be later averaged out            
             if( corrIndex[0] < len(spatTempCorr[0]) ):
                 if( corrIndex[1] < len(spatTempCorr) ):
                     spatTempCorr[corrIndex[1]][corrIndex[0]] = spattemp_correlation(rand_vecs, particles, corrCalcK) / statCorrNormalisation
@@ -113,79 +102,81 @@ if __name__ == "__main__":
                 else:
                     corrIndex[1] = 0
                     corrIndex[0] += 1
-                    print("Here we go")
+                    print("Starting new dataset number {}".format(corrIndex[0]))
                     time_zero(particles, rand_vecs, t)
                     statCorrNormalisation = static_correlation(rand_vecs, particles, [corrCalcK])
-                	
-        #np.savetxt("{0}.txt".format(t), output)#"simulation1/%.2f.txt" % t, output)
-        ## save coordinates & angle vectors
-        #output = np.concatenate((particles,rand_vecs),axis=1)
-        
-        for i, (x, y, z) in enumerate(particles):
-            # get neighbor indices for current particle
-            neighbours = get_neighbors(distances, r, i)
-        
-            # get average theta vector
-            avg = get_average(rand_vecs, neighbours)
-        
-            # get noise vector
-            noise = np.random.uniform(0, eta) * rand_vector()
-            new_dir = ( (avg + noise) / np.sqrt(np.dot(avg + noise, avg + noise)) )
-        
-            # move to new position 
-            particles[i,:] += delta_t * vel * new_dir
-        
-            # get new angle vector
-            rand_vecs[i] = new_dir
-        
-            # assure correct boundaries (xmax,ymax) = (box_size, box_size)
-            if particles[i,0] < 0:
-                particles[i,0] = box_size + particles[i,0]
-        
-            if particles[i,0] > box_size:
-                particles[i,0] = particles[i,0] - box_size
-        
-            if particles[i,1] < 0:
-                particles[i,1] = box_size + particles[i,1]
-        
-            if particles[i,1] > box_size:
-                particles[i,1] = particles[i,1] - box_size
-        
-            if particles[i,2] < 0:
-                particles[i,2] = box_size + particles[i,2]
-        
-            if particles[i,2] > box_size:
-                particles[i,2] = particles[i,2] - box_size
+            	
+    #np.savetxt("{0}.txt".format(t), output)#"simulation1/%.2f.txt" % t, output)
+    ## save coordinates & angle vectors
+    #output = np.concatenate((particles,rand_vecs),axis=1)
+    """Timestep"""
+    for i, (x, y, z) in enumerate(particles):
+        # get neighbor indices for current particle
+        neighbours = get_neighbors(distances, r, i)
     
-        # new time step
-        t += delta_t
+        # get average theta vector
+        avg = get_average(rand_vecs, neighbours)
+    
+        # get noise vector
+        noise = np.random.uniform(0, eta) * rand_vector()
+        new_dir = ( (avg + noise) / np.sqrt(np.dot(avg + noise, avg + noise)) )
+    
+        # move to new position 
+        particles[i,:] += delta_t * vel * new_dir
+    
+        # get new angle vector
+        rand_vecs[i] = new_dir
+    
+        # assure correct boundaries (xmax,ymax) = (box_size, box_size)
+        if particles[i,0] < 0:
+            particles[i,0] = box_size + particles[i,0]
+    
+        if particles[i,0] > box_size:
+            particles[i,0] = particles[i,0] - box_size
+    
+        if particles[i,1] < 0:
+            particles[i,1] = box_size + particles[i,1]
+    
+        if particles[i,1] > box_size:
+            particles[i,1] = particles[i,1] - box_size
+    
+        if particles[i,2] < 0:
+            particles[i,2] = box_size + particles[i,2]
+    
+        if particles[i,2] > box_size:
+            particles[i,2] = particles[i,2] - box_size
+
+    # new time step
+    t += delta_t
+    
+else:
+    """HEREAFTER WE CARE ABOUT THE STATIC CORRELATION"""
+    if(isStatic):
+        statCorrTimeAvg = statCorrTimeAvg / counter
         
-    else:
-        """HEREAFTER WE CARE ABOUT THE STATIC CORRELATION"""
-#        statCorrTimeAvg = statCorrTimeAvg / counter
-#        
-#        f=open("statCorr_{0}_{1}_{3}steps_{2}.txt".format(len(particles), box_size, time.time(), T),'ba')
-#        output = np.concatenate((wavenums, statCorrTimeAvg),axis=0)
-#        np.savetxt(f,output)
-#        f.close()
-#        
-#        susc = susceptibility(statCorrTimeAvg)
-#        critX = critX / counter
-#        print("susc: {}. x: {}".format(susc, critX))
-#        
-#        f=open("{0}_{1}_{3}steps_{2}.txt".format(len(particles), box_size, time.time(), T),'ba')
-#        output = np.array([susc, critX])
-#        np.savetxt(f,output)
-#        f.close()
-#        
-#        plt.subplot(2, 1, 1)
-#        plt.plot(wavenums, statCorrTimeAvg)
-#        plt.subplot(2, 1, 2)
-#        plt.plot(range(len(polarisation)), polarisation)
-#        plt.show()
-        """END"""
+        f=open("statCorr_{0}_{1}_{3}steps_{2}.txt".format(len(particles), box_size, time.time(), T),'ba')
+        output = np.concatenate((wavenums, statCorrTimeAvg),axis=0)
+        np.savetxt(f,output)
+        f.close()
         
-        """HEREAFTER WE CARE ABOUT THE SPATIO-TEMPORAL CORRELATION"""
+        susc = susceptibility(statCorrTimeAvg)
+        critX = critX / counter
+        print("susc: {}. x: {}".format(susc, critX))
+        
+        f=open("{0}_{1}_{3}steps_{2}.txt".format(len(particles), box_size, time.time(), T),'ba')
+        output = np.array([susc, critX])
+        np.savetxt(f,output)
+        f.close()
+        
+        plt.subplot(2, 1, 1)
+        plt.plot(wavenums, statCorrTimeAvg)
+        plt.subplot(2, 1, 2)
+        plt.plot(range(len(polarisation)), polarisation)
+        plt.show()
+    """END STATCORR"""
+    
+    """HEREAFTER WE CARE ABOUT THE SPATIO-TEMPORAL CORRELATION"""
+    if(isStatic is not True):
         #plt.plot(range(len(spatTempCorr)), spatTempCorr)
         
         spatTempCorr = np.mean(spatTempCorr, axis=1)
@@ -197,7 +188,8 @@ if __name__ == "__main__":
         
         plt.plot(range(len(spatTempCorr)), spatTempCorr)
         plt.show()
-        """END"""
+        plt.plot(range(len(polarisation)), polarisation)
+    """END SPATTEMPCORR"""
         
         
         
