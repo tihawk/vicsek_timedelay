@@ -102,3 +102,11 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# stuff with data
+static_corr_nodelay
+spattemp_corr_nodelay
+simulation2
+plots
+run.sh
+analysis.ods
