@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import numpy as np
+from collections import deque
 from geometry3d import rand_vector, get_all_distances
 from neighbour import get_neighbours, get_average
 from correlation import static_correlation, spattemp_correlation, time_zero, polarisation
@@ -12,6 +13,9 @@ import matplotlib.pyplot as plt
 # number of particles
 N = 128
 
+# size of system
+box_size = 6.
+
 # noise intensity
 eta = 0.45
 
@@ -22,20 +26,20 @@ r = 1.
 t = 0
 delta_t = 1
 
-# size of system
-box_size = 7.5
-
 # maximum time steps
-T = 10000*delta_t
+T = 2000*delta_t
 
 # velocity of particles
 vel = 0.05
 
+#length of time delay
+timeDelay = 1
+
 # are we running for static correlation (true) or spattemp corr (false)
-isStatic = False
+isStatic = True
 
 # wavenumber for calculating the spattemp correlation
-corrCalcK = 0.704
+corrCalcK = 0.706
 
 # the length of the dataset for the spattemp correlation (in units of time)
 timeLength = 200
@@ -61,9 +65,14 @@ critX = 0
 counter = 0
 timestepTime = time.time()
 
-#init spattempcorr
+# init spattempcorr
 spatTempCorr = np.zeros(shape=(timeLength, (T - corrCalcStart)/(timeLength)))
 corrIndex = [0, 0]
+
+# init time delay
+updtQueue = np.zeros((N), dtype=deque)
+for i in range(N):
+    updtQueue[i] = deque()
 """END INIT"""
 
 """TIMESTEP AND THINGS TO DO WHEN VISITING"""    
@@ -131,18 +140,27 @@ while t < T:
         avg = get_average(rand_vecs, neighbours)
     
         # get noise vector
-        noise = np.random.uniform(0, eta) * rand_vector()
+        noise = eta*rand_vector()#np.random.uniform(0, eta) * rand_vector()
         
         # calculate the new unit vector for the particle, taking into account
         # the noise, and of course - normalisation
         avgAndNoise = avg + noise
         new_dir = ( (avgAndNoise) / np.sqrt(np.dot(avgAndNoise, avgAndNoise)) )
-    
-        # move to new position 
-        particles[i,:] += delta_t * vel * new_dir
-    
-        # get new unit vector vector
-        rand_vecs[i] = new_dir
+        
+        # add new unit vector to queue for current particle
+        updtQueue[i].append(new_dir)
+        
+        # if the queue is long enough, dequeue and change unit vector accordingly
+        # otherwise continue on previous trajectory
+        if(len(updtQueue[i]) >= timeDelay):
+            newVec = updtQueue[i].popleft()
+            # move to new position 
+            particles[i,:] += delta_t * vel * newVec
+            # get new unit vector vector
+            rand_vecs[i] = newVec
+        else:
+            # move to new position using old unit vector
+            particles[i,:] += delta_t * vel * rand_vecs[i]
     
         # assure correct boundaries (xmax,ymax) = (box_size, box_size)
         if particles[i,0] < 0:
