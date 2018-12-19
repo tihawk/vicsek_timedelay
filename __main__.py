@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 N = 128
 
 # size of system
-box_size = 6.
+box_size = 6.5
 
 # noise intensity
 eta = 0.45
@@ -27,7 +27,7 @@ t = 0
 delta_t = 1
 
 # maximum time steps
-T = 2000*delta_t
+T = 10000*delta_t
 
 # velocity of particles
 vel = 0.05
@@ -36,13 +36,13 @@ vel = 0.05
 timeDelay = 1
 
 # are we running for static correlation (true) or spattemp corr (false)
-isStatic = True
+isStatic = False
 
 # wavenumber for calculating the spattemp correlation
 corrCalcK = 0.706
 
 # the length of the dataset for the spattemp correlation (in units of time)
-timeLength = 200
+timeLength = 150
 
 # the time at which to start the spattemp corr calculations (in ratio of T)
 corrCalcStart = 0.1*T
@@ -152,7 +152,7 @@ while t < T:
         
         # if the queue is long enough, dequeue and change unit vector accordingly
         # otherwise continue on previous trajectory
-        if(len(updtQueue[i]) >= timeDelay):
+        if(len(updtQueue[i]) > timeDelay):
             newVec = updtQueue[i].popleft()
             # move to new position 
             particles[i,:] += delta_t * vel * newVec
@@ -193,7 +193,7 @@ else:
     if(isStatic):
         statCorrTimeAvg = statCorrTimeAvg / counter
         
-        f=open("statCorr_{0}_{1}_{3}steps_{2}.txt".format(len(particles), box_size, time.time(), T),'ba')
+        f=open("statCorr_{0}_{1}_{4}delay_{3}steps_{2}.txt".format(N, box_size, time.time(), T, timeDelay),'ba')
         output = np.concatenate((wavenums, statCorrTimeAvg),axis=0)
         np.savetxt(f,output)
         f.close()
@@ -202,7 +202,7 @@ else:
         critX = critX / counter
         print("susc: {}. x: {}".format(susc, critX))
         
-        f=open("{0}_{1}_{3}steps_{2}.txt".format(len(particles), box_size, time.time(), T),'ba')
+        f=open("{0}_{1}_{4}delay_{3}steps_{2}.txt".format(N, box_size, time.time(), T, timeDelay),'ba')
         output = np.array([susc, critX])
         np.savetxt(f,output)
         f.close()
@@ -220,7 +220,7 @@ else:
         
         spatTempCorr = np.mean(spatTempCorr, axis=1)
         
-        f=open("spatTempCorr_{0}_{1}_{4}_{3}steps_{2}.txt".format(len(particles), box_size, time.time(), T, corrCalcK),'ba')
+        f=open("spatTempCorr_{0}_{1}_{5}delay_{4}_{3}steps_{2}.txt".format(N, box_size, time.time(), T, corrCalcK, timeDelay),'ba')
         output = spatTempCorr
         np.savetxt(f,output)
         f.close()

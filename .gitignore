@@ -106,6 +106,8 @@ venv.bak/
 # stuff with data
 static_corr_nodelay
 spattemp_corr_nodelay
+static_corr_delay
+spattemp_corr_delay
 simulation2
 plots
 run.sh

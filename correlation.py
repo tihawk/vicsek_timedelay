@@ -1,4 +1,5 @@
 import numpy as np
+from geometry3d import coords_wrt_centre_mass
 from scipy.spatial.distance import cdist
 
 # list of values for the polarisation at times t (global)
@@ -24,6 +25,8 @@ def dim_vel_fluctuations(particleVectors):
 
 # get a matrix lookup table of all distances between particles
 def distance_touple(particles1, particles2):
+    particles1 = coords_wrt_centre_mass(particles1)
+    particles2 = coords_wrt_centre_mass(particles2)
     return cdist(particles1, particles2)
 
 # static correlation function for a range of wavenumbers at time t
@@ -51,7 +54,7 @@ def time_zero(particles, vectors, t):
     global particles_t0, dimVelFluct3D_t0, time0
     
     time0 = t
-    particles_t0 = particles#coords_wrt_centre_mass(particles)
+    particles_t0 = particles
     dimVelFluct_t0 = dim_vel_fluctuations(vectors)
     dimVelFluct3D_t0 = np.array([dimVelFluct_t0]*len(particles))
     
