@@ -1,6 +1,12 @@
 import numpy as np
-from geometry3d import coords_wrt_centre_mass
-from scipy.spatial.distance import cdist
+from scipy.spatial.distance import cdist, pdist, squareform
+import globals
+
+from numba import jit
+
+# not doing this removes the benefits from numba???
+globals.initialise()
+box_size = globals.box_size
 
 # list of values for the polarisation at times t (global)
 polarisation = []
@@ -10,6 +16,7 @@ particles_t0 = []
 dimVelFluct3D_t0 = []
 time0 = 0
 
+@jit
 # calculate the dimensionless velocity fluctuations used in corr calculations
 def dim_vel_fluctuations(particleVectors):
 
@@ -23,17 +30,42 @@ def dim_vel_fluctuations(particleVectors):
         
     return dimVelFluct
 
+# change coordinates to be wrt the centre of mass of the particles. Because
+    # of the periodic boundary conditions, the coordinates are first mapped
+    # onto a circle (see wiki)
+@jit("float64[:](float64[:])")
+def coords_wrt_centre_mass(particles):
+    theta = particles * 2*np.pi/box_size
+    xi = np.cos(theta)
+    zeta = np.sin(theta)
+    xi = np.mean(xi, axis=0)
+    zeta = np.mean(zeta, axis=0)
+    theta = np.arctan2(-zeta, -xi) + np.pi
+    cM = box_size*theta/(2*np.pi)
+
+    return particles - cM
+
+@jit
 # get a matrix lookup table of all distances between particles
+    # Static Correlation
+def distance_touple_stat(particles):
+    particles = coords_wrt_centre_mass(particles)
+    return squareform(pdist(particles))
+
+@jit
+# get a matrix lookup table of all distances between particles
+    # Spatio-temporal Correlation
 def distance_touple(particles1, particles2):
     particles1 = coords_wrt_centre_mass(particles1)
     particles2 = coords_wrt_centre_mass(particles2)
     return cdist(particles1, particles2)
 
+@jit
 # static correlation function for a range of wavenumbers at time t
 def static_correlation(vectors, particles, kVal):    
     N = len(particles)
     deltaV = dim_vel_fluctuations(vectors)
-    r_ij = distance_touple(particles, particles)
+    r_ij = distance_touple_stat(particles)
     
     statCorr = np.zeros(len(kVal))
     dVTensor = np.array([deltaV]*N)
@@ -47,6 +79,7 @@ def static_correlation(vectors, particles, kVal):
             
     return statCorr
 
+@jit
 # get the positions and unit vectors of the particles at t_0 for the purpose
     #of calculating the static correlation with wich to normalise the
     #spatio-temporal correlation
@@ -58,6 +91,7 @@ def time_zero(particles, vectors, t):
     dimVelFluct_t0 = dim_vel_fluctuations(vectors)
     dimVelFluct3D_t0 = np.array([dimVelFluct_t0]*len(particles))
     
+@jit
 # spatio-temporal correlation function for wavenumber k at time t (not normalised)
 def spattemp_correlation(vectors, particles, k):    
     N = len(particles)
@@ -73,3 +107,19 @@ def spattemp_correlation(vectors, particles, k):
     Corr = np.sum(temp) / N
             
     return Corr
+
+""" ADDITIONAL """
+
+# get susceptibility defined as the maximum of the static correlation function
+def susceptibility(statCorr):
+    return np.max(statCorr)
+    
+# get nearest neighbour distances at time t
+def criticality_x(distances, r):
+    nearest = np.zeros(len(distances[0]))
+    
+    for i in range(len(distances[0])):
+        nearest[i] = np.min(distances[i][np.nonzero(distances[i])])
+    
+    r1 = np.mean(nearest)
+    return r1/r
