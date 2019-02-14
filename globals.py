@@ -7,7 +7,7 @@ def initialise():
     
     # size of system
     global box_size
-    box_size = 11.5
+    box_size = 12.
     
     # noise intensity
     global eta

@@ -1,10 +1,10 @@
 #!/usr/bin/python
 import numpy as np 
-from scipy.spatial.distance import pdist, squareform
+#from scipy.spatial.distance import pdist, squareform, cdist
 from math import pi, sin, cos, sqrt
 import globals
 
-from numba import jit
+from numba import jit, guvectorize, cuda
 
 # not doing this removes the benefits from numba???
 globals.initialise()
@@ -23,19 +23,59 @@ def rand_vector():
 #    diff = np.abs(p - q)
 #    return np.linalg.norm(np.minimum(diff, box_size - diff))
     
-@jit("float64(float64[:], float64[:])")
-def wrapped_euclidean_points(p, q):
-    diff = np.abs(p - q)
-    diff = diff - np.rint(diff / box_size) * box_size
-    return np.sqrt(diff[0]**2 + diff[1]**2 + diff[2]**2)
+#@jit("float64(float64[:], float64[:])")
+#def wrapped_euclidean_points(p, q):
+#    diff = np.abs(p - q)
+#    diff = diff - np.rint(diff / box_size) * box_size
+#    return np.sqrt(diff[0]**2 + diff[1]**2 + diff[2]**2)
+#
+#@jit("float64[:](float64[:])")
+## generate a lookup matrix table of distances between particles at time t
+#def get_all_distances(particles):
+#    distances = pdist(particles, metric=wrapped_euclidean_points)
+#    # NOTE: I don't know why, but squareform is faster than condensed
+#    distances = squareform(distances)
+##    distances = cdist(particles, particles, metric=wrapped_euclidean_points)
+#    return distances
 
-@jit("float64[:](float64[:])")
-# generate a lookup matrix table of distances between particles at time t
-def get_all_distances(particles):
-    distances = pdist(particles, metric=wrapped_euclidean_points)
-    # NOTE: I don't know why, but squareform is faster than condensed
-    distances = squareform(distances)
-    return distances
+@guvectorize(['float64[:,:], float64[:,:]'], '(m, n) -> (m, m)')
+#@cuda.jit
+def get_all_distances(ps, res):
+    
+    m = ps.shape[0]
+#    n = ps.shape[1]
+#    i, j = cuda.grid(2)
+#    print(m)
+#    print(n)
+#    res = np.zeros((m, m))
+    
+    for i in range(m):
+        for j in range(m):
+#    if i < m and j < m:
+            dx = abs( ps[i,0] - ps[j,0] )
+            dy = abs( ps[i,1] - ps[j,1] )
+            dz = abs( ps[i,2] - ps[j,2] )
+            dx = dx - int(dx/box_size) * box_size
+            dy = dy - int(dy/box_size) * box_size
+            dz = dz - int(dz/box_size) * box_size
+            res[i, j] = (dx**2 + dy**2 + dz**2)**0.5
+            
+#    return res
+            
+#def gpu_get_all_distances(particles):
+#
+#    rows = particles.shape[0]
+#
+#    block_dim = (16, 16)
+#    grid_dim = (int(rows/block_dim[0] + 1), int(rows/block_dim[1] + 1))
+#
+#    stream = cuda.stream()
+#    particles2 = cuda.to_device(np.asarray(particles, dtype=np.float64), stream=stream)
+#    res2 = cuda.device_array((rows, rows))
+#    get_all_distances[grid_dim, block_dim](particles2, res2)
+#    out = res2.copy_to_host(stream=stream)
+#
+#    return out
 
 # SLOWER FOR WHATEVER REASON...
 # convert ij index to a condensed index for looking up

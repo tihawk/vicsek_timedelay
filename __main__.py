@@ -2,12 +2,10 @@
 import numpy as np
 from collections import deque
 import globals
-from geometry3d import rand_vector, get_all_distances,\
-     get_neighbours, get_average
-#from neighbour import get_neighbours, get_average
+from geometry3d import rand_vector, get_all_distances\
+     ,get_neighbours, get_average
 from correlation import static_correlation, spattemp_correlation,\
      time_zero, polarisation, susceptibility, criticality_x
-#from susceptibility import susceptibility, criticality_x
 import time
 import matplotlib.pyplot as plt
 
@@ -69,7 +67,6 @@ for i in range(N):
     updtQueue[i] = deque()
 """END INIT"""
 
-#@jit("void()")
 @guvectorize(["void(float64[:,:], float64[:,:], float64[:,:], float64[:,:])"],\
               '(m, n), (m, n) -> (m, n), (m, n)')
 def timestep(particles, rand_vecs, resParticles, resRand_vecs):
@@ -129,8 +126,10 @@ def timestep(particles, rand_vecs, resParticles, resRand_vecs):
 # Run until time ends
 while t < T:
     # print progress update and time spent on n steps
-    if t%10 == 0:
-        print ("step {}. time for 10 steps {}".format(t, time.time()-timestepTime))
+    if t%100 == 0:
+        print ("step {}. avg. time for 10 steps {}".format(
+                t, (time.time()-timestepTime)/10
+                ))
         timestepTime = time.time()
         
     # get all relative distances between particles before looking for neighbours
