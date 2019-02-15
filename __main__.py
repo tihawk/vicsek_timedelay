@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import sys
 import numpy as np
 from collections import deque
 import globals
@@ -13,7 +14,11 @@ from numba import guvectorize
 
 """INITIALISE"""
 globals.initialise()
-
+globals.N = int(sys.argv[1])
+globals.box_size = float(sys.argv[2])
+globals.timeDelay = int(sys.argv[3])
+globals.isStatic = bool(sys.argv[4])
+globals.corrCalcK = float(sys.argv[5])
 # number of particles
 N = globals.N
 # size of system
@@ -127,7 +132,7 @@ def timestep(particles, rand_vecs, resParticles, resRand_vecs):
 while t < T:
     # print progress update and time spent on n steps
     if t%100 == 0:
-        print ("step {}. avg. time for 10 steps {}".format(
+        print ("step {}: avg. time for 10 steps {:3f}".format(
                 t, (time.time()-timestepTime)/10
                 ))
         timestepTime = time.time()
@@ -149,7 +154,7 @@ while t < T:
             statCorrTimeAvg += data
             counter = counter + 1
             critX += criticality_x(distances, r)
-            print("cereal calc time: {}".format(time.time()-start))
+            print("cereal calc time: {:3f}".format(time.time()-start))
        
     """SpatTempCorr"""
     # after a certain amount of steps (i.e. 50%), start calculating the spatio-
@@ -220,9 +225,9 @@ else:
         np.savetxt(f,output)
         f.close()
         
-        plt.plot(wavenums, statCorrTimeAvg)
-        plt.show()
-        plt.plot(range(len(polarisation)), polarisation)
+#        plt.plot(wavenums, statCorrTimeAvg)
+#        plt.show()
+#        plt.plot(range(len(polarisation)), polarisation)
     """END STATCORR"""
     
     """HEREAFTER WE CARE ABOUT THE SPATIO-TEMPORAL CORRELATION"""
@@ -241,7 +246,7 @@ else:
         np.savetxt(f,output)
         f.close()
         
-        plt.plot(range(len(spatTempCorr)), spatTempCorr)
-        plt.show()
-        plt.plot(range(len(polarisation)), polarisation)
+#        plt.plot(range(len(spatTempCorr)), spatTempCorr)
+#        plt.show()
+#        plt.plot(range(len(polarisation)), polarisation)
     """END SPATTEMPCORR"""

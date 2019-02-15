@@ -55,9 +55,9 @@ def get_all_distances(ps, res):
             dx = abs( ps[i,0] - ps[j,0] )
             dy = abs( ps[i,1] - ps[j,1] )
             dz = abs( ps[i,2] - ps[j,2] )
-            dx = dx - int(dx/box_size) * box_size
-            dy = dy - int(dy/box_size) * box_size
-            dz = dz - int(dz/box_size) * box_size
+            dx = dx - np.rint(dx/box_size) * box_size
+            dy = dy - np.rint(dy/box_size) * box_size
+            dz = dz - np.rint(dz/box_size) * box_size
             res[i, j] = (dx**2 + dy**2 + dz**2)**0.5
             
 #    return res

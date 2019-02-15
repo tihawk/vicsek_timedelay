@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial.distance import cdist, pdist, squareform
 import globals
 
-from numba import jit, guvectorize
+#from numba import jit
 
 # not doing this removes the benefits from numba???
 globals.initialise()
@@ -17,8 +17,8 @@ dimVelFluct3D_t0 = []
 time0 = 0
 
 # calculate the dimensionless velocity fluctuations used in corr calculations
-@guvectorize(['float64[:,:], float64[:,:]'], '(m, n) -> (m, n)')
-def dim_vel_fluctuations(particleVectors, res):
+#@jit
+def dim_vel_fluctuations(particleVectors):
 
     global polarisation
     avgVector = np.mean(particleVectors, axis=0)
@@ -28,13 +28,13 @@ def dim_vel_fluctuations(particleVectors, res):
     sqAvgVelFluct = np.mean(sqAvgVelFluct)
     dimVelFluct = velFluct / np.sqrt(sqAvgVelFluct)
         
-    res = dimVelFluct
+    return dimVelFluct
 
 # change coordinates to be wrt the centre of mass of the particles. Because
     # of the periodic boundary conditions, the coordinates are first mapped
     # onto a circle (see wiki)
-@guvectorize(['float64[:,:], float64[:,:]'], '(m, n) -> (m, n)')
-def coords_wrt_centre_mass(particles, res):
+#@jit
+def coords_wrt_centre_mass(particles):
     theta = particles * 2*np.pi/box_size
     xi = np.cos(theta)
     zeta = np.sin(theta)
@@ -43,28 +43,26 @@ def coords_wrt_centre_mass(particles, res):
     theta = np.arctan2(-zeta, -xi) + np.pi
     cM = box_size*theta/(2*np.pi)
 
-    res = particles - cM
+    return particles - cM
 
 # get a matrix lookup table of all distances between particles
     # Static Correlation
-@jit
+#@jit
 def distance_touple_stat(particles):
     particles = coords_wrt_centre_mass(particles)
     return squareform(pdist(particles))
 
 # get a matrix lookup table of all distances between particles
     # Spatio-temporal Correlation
-@jit
+#@jit
 def distance_touple(particles1, particles2):
     particles1 = coords_wrt_centre_mass(particles1)
     particles2 = coords_wrt_centre_mass(particles2)
     return cdist(particles1, particles2)
 
 # static correlation function for a range of wavenumbers at time t
-@guvectorize(['void(float64[:,:], float64[:,:], float64[:], float64[:])']
-            , '(m, n), (m, n), (k) -> (k)'
-            )
-def static_correlation(vectors, particles, kVal, res):    
+#@jit
+def static_correlation(vectors, particles, kVal):    
     N = len(particles)
     deltaV = dim_vel_fluctuations(vectors)
     r_ij = distance_touple_stat(particles)
@@ -79,12 +77,12 @@ def static_correlation(vectors, particles, kVal, res):
         temp = temp[~np.isnan(temp)]
         statCorr[ind] = np.sum(temp) / N
             
-    res = statCorr
+    return statCorr
 
 # get the positions and unit vectors of the particles at t_0 for the purpose
     #of calculating the static correlation with wich to normalise the
     #spatio-temporal correlation
-@jit
+#@jit
 def time_zero(particles, vectors, t):
     global particles_t0, dimVelFluct3D_t0, time0
     
@@ -94,7 +92,7 @@ def time_zero(particles, vectors, t):
     dimVelFluct3D_t0 = np.array([dimVelFluct_t0]*len(particles))
     
 # spatio-temporal correlation function for wavenumber k at time t (not normalised)
-@jit
+#@jit
 def spattemp_correlation(vectors, particles, k):    
     N = len(particles)
     deltaV = dim_vel_fluctuations(vectors)
