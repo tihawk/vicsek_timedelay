@@ -110,5 +110,4 @@ static_corr_delay
 spattemp_corr_delay
 simulation2
 plots
-run.sh
 analysis.ods
