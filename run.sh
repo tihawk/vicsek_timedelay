@@ -19,7 +19,7 @@ echo "k for spatio-temporal correlation =" $5
 # according to the variables, sets up where
 # the data gets saved
 case $isStatic in
-	"True")
+	1)
 	
 		case $dt in
 			0)
@@ -31,7 +31,7 @@ case $isStatic in
 		esac
 		;;
 		
-	"False")
+	0)
 	
 		case $dt in
 			0)
@@ -58,20 +58,16 @@ pwd
 # runs a set of 5 simulations for static correlation function calc
 # runs 1 simulation for spatio-temporal correlation function calc
 case $isStatic in
-	"True")
-		echo "Running 5 simulations one after the other"
-		python $HOME/__main__.py $N $L $dt $isStatic $k
-		wait
-		python $HOME/__main__.py $N $L $dt $isStatic $k
-		wait
-		python $HOME/__main__.py $N $L $dt $isStatic $k
-		wait
-		python $HOME/__main__.py $N $L $dt $isStatic $k
-		wait
-		python $HOME/__main__.py $N $L $dt $isStatic $k
-		wait
+	1)
+		for i in 1 2 3 4 5
+		do
+			echo "Running 5 simulations consecutively"
+			echo "Starting number $i/5"
+			python $HOME/__main__.py $N $L $dt $isStatic $k
+			wait
+		done
 		;;
-	"False")
+	0)
 		echo "Running one simulation"
 		python $HOME/__main__.py $N $L $dt $isStatic $k
 		wait

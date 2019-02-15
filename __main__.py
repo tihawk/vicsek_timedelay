@@ -17,8 +17,14 @@ globals.initialise()
 globals.N = int(sys.argv[1])
 globals.box_size = float(sys.argv[2])
 globals.timeDelay = int(sys.argv[3])
-globals.isStatic = bool(sys.argv[4])
+globals.isStatic = int(sys.argv[4])
 globals.corrCalcK = float(sys.argv[5])
+if globals.isStatic==1:
+    globals.T = 10000*globals.delta_t
+    globals.corrCalcStart = 0.1*globals.T
+elif globals.isStatic==0:
+    globals.T = 100000*globals.delta_t
+    globals.corrCalcStart = 0.1*globals.T
 # number of particles
 N = globals.N
 # size of system
@@ -72,9 +78,9 @@ for i in range(N):
     updtQueue[i] = deque()
 """END INIT"""
 
-@guvectorize(["void(float64[:,:], float64[:,:], float64[:,:], float64[:,:])"],\
-              '(m, n), (m, n) -> (m, n), (m, n)')
-def timestep(particles, rand_vecs, resParticles, resRand_vecs):
+#@guvectorize(["void(float64[:,:], float64[:,:], float64[:,:], float64[:,:])"],\
+#              '(m, n), (m, n) -> (m, n), (m, n)')
+def timestep(particles, rand_vecs):
     # actual simulation timestep
     for i, (x, y, z) in enumerate(particles):
         # get neighbor indices for current particle
@@ -89,7 +95,10 @@ def timestep(particles, rand_vecs, resParticles, resRand_vecs):
         # calculate the new unit vector for the particle, taking into account
         # the noise, and of course - normalisation
         avgAndNoise = avg + noise
-        new_dir = ( (avgAndNoise) / np.sqrt(np.dot(avgAndNoise, avgAndNoise)) )
+        try:
+            new_dir = ( (avgAndNoise) / np.linalg.norm(avgAndNoise) )
+        except:
+            print("AHA!!!")
         
         # add new unit vector to queue for current particle
         updtQueue[i].append(new_dir)
@@ -99,31 +108,31 @@ def timestep(particles, rand_vecs, resParticles, resRand_vecs):
         if(len(updtQueue[i]) > timeDelay):
             newVec = updtQueue[i].popleft()
             # move to new position 
-            resParticles[i,:] = particles[i,:] + delta_t * vel * newVec
+            particles[i,:] = particles[i,:] + delta_t * vel * newVec
             # get new unit vector vector
-            resRand_vecs[i] = newVec
+            rand_vecs[i] = newVec
         else:
             # move to new position using old unit vector
-            resParticles[i,:] = particles[i,:] + delta_t * vel * rand_vecs[i]
+            particles[i,:] = particles[i,:] + delta_t * vel * rand_vecs[i]
     
         # assure correct boundaries (xmax,ymax) = (box_size, box_size)
-        if resParticles[i,0] < 0:
-            resParticles[i,0] = box_size + resParticles[i,0]
+        if particles[i,0] < 0:
+            particles[i,0] = box_size + particles[i,0]
     
-        if resParticles[i,0] > box_size:
-            resParticles[i,0] = resParticles[i,0] - box_size
+        if particles[i,0] > box_size:
+            particles[i,0] = particles[i,0] - box_size
     
-        if resParticles[i,1] < 0:
-            resParticles[i,1] = box_size + resParticles[i,1]
+        if particles[i,1] < 0:
+            particles[i,1] = box_size + particles[i,1]
     
-        if resParticles[i,1] > box_size:
-            resParticles[i,1] = resParticles[i,1] - box_size
+        if particles[i,1] > box_size:
+            particles[i,1] = particles[i,1] - box_size
     
-        if resParticles[i,2] < 0:
-            resParticles[i,2] = box_size + resParticles[i,2]
+        if particles[i,2] < 0:
+            particles[i,2] = box_size + particles[i,2]
     
-        if resParticles[i,2] > box_size:
-            resParticles[i,2] = resParticles[i,2] - box_size
+        if particles[i,2] > box_size:
+            particles[i,2] = particles[i,2] - box_size
 
 
 
@@ -145,7 +154,7 @@ while t < T:
     # correlation function at time t for a range of wavenumbers, in order to
     # build up an average. Meanwhile get the nearest neighbour distance at
     # time t. Later that will be averaged out as well.
-    if(isStatic):
+    if(isStatic==1):
         if t >= (T - 0.1*T):
             start = time.time()
         
@@ -161,13 +170,13 @@ while t < T:
     # temporal correlation function. That will be calculated for a certain
     # amount of steps, after which a new dataset will be created, and the process
     # repeated. Later those will be averaged out.
-    if(isStatic is not True):
+    if(isStatic==0):
         # get time zero vars for spattempcorr
         if t == (corrCalcStart - delta_t):
             print("Here we go")
             time_zero(particles, rand_vecs, t)
-            statCorrNormalisation = static_correlation(
-                    rand_vecs, particles, [corrCalcK]
+            statCorrNormalisation = spattemp_correlation(
+                    rand_vecs, particles, corrCalcK
                     )
             
         if t >= corrCalcStart:
@@ -186,14 +195,14 @@ while t < T:
                     print("Starting new dataset number {}".format(corrIndex[0]))
                     time_zero(particles, rand_vecs, t)
                     statCorrNormalisation =\
-                        static_correlation(rand_vecs, particles, [corrCalcK])
+                        spattemp_correlation(rand_vecs, particles, corrCalcK)
             	
     #np.savetxt("{0}.txt".format(t), output)#"simulation1/%.2f.txt" % t, output)
     ## save coordinates & angle vectors
     #output = np.concatenate((particles,rand_vecs),axis=1)
     """Timestep"""
     
-    particles, rand_vecs = timestep(particles, rand_vecs)
+    timestep(particles, rand_vecs)
     
     # new time step
     t += delta_t
@@ -204,7 +213,7 @@ else:
     # the susceptibility (defined as the maximum of the static correlation) and
     # nearest neighbour distance, will be averaged, saved and printed as well.
     # the polarisation will be printed as well
-    if(isStatic):
+    if(isStatic==1):
         statCorrTimeAvg = statCorrTimeAvg / counter
         
         f=open("statCorr_{0}_{1}_{4}delay_{3}steps_{2}.txt".format(
@@ -234,9 +243,10 @@ else:
     # here the data for the spatio-temporal correlation will be averaged,
         # saved and plotted.
     # the polarisation will be printed as well
-    if(isStatic is not True):
+    if(isStatic==0):
         #plt.plot(range(len(spatTempCorr)), spatTempCorr)
         
+        print(spatTempCorr[:][:5])
         spatTempCorr = np.mean(spatTempCorr, axis=1)
         
         f=open("spatTempCorr_{0}_{1}_{5}delay_{4}_{3}steps_{2}.txt".format(

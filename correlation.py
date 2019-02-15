@@ -73,7 +73,8 @@ def static_correlation(vectors, particles, kVal):
     
     for ind, wn in enumerate(kVal):
         kr = wn*r_ij
-        temp = np.sin(kr)*dottedDV/kr
+        checkZero = np.where(kr>0, np.sin(kr)/kr, 1)
+        temp = checkZero*dottedDV
         temp = temp[~np.isnan(temp)]
         statCorr[ind] = np.sum(temp) / N
             

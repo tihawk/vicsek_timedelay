@@ -37,7 +37,7 @@ def initialise():
     
     # are we running for static correlation (true) or spattemp corr (false)
     global isStatic
-    isStatic = True
+    isStatic = 1
     
     # wavenumber for calculating the spattemp correlation
     global corrCalcK
