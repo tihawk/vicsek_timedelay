@@ -2,7 +2,6 @@
 import sys
 import numpy as np
 from collections import deque
-import globals
 from geometry3d import rand_vector, get_all_distances\
      ,get_neighbours, get_average
 from correlation import static_correlation, spattemp_correlation,\
@@ -10,46 +9,50 @@ from correlation import static_correlation, spattemp_correlation,\
 import time
 import matplotlib.pyplot as plt
 
-from numba import guvectorize
-
 """INITIALISE"""
-globals.initialise()
-globals.N = int(sys.argv[1])
-globals.box_size = float(sys.argv[2])
-globals.timeDelay = int(sys.argv[3])
-globals.isStatic = int(sys.argv[4])
-globals.corrCalcK = float(sys.argv[5])
-if globals.isStatic==1:
-    globals.T = 10000*globals.delta_t
-    globals.corrCalcStart = 0.1*globals.T
-elif globals.isStatic==0:
-    globals.T = 100000*globals.delta_t
-    globals.corrCalcStart = 0.1*globals.T
+
+"""Simulation Variables"""
+# Set these before running!!!
 # number of particles
-N = globals.N
+N = int(sys.argv[1])
+
 # size of system
-box_size = globals.box_size
-# noise intensity
-eta = globals.eta
-# neighbour radius
-r = globals.r
-# time step
-t = globals.t
-delta_t = globals.delta_t
-# maximum time steps
-T = globals.T
-# velocity of particles
-vel = globals.vel
+box_size = float(sys.argv[2])
+
 # length of time delay
-timeDelay = globals.timeDelay
+timeDelay = int(sys.argv[3])
+
 # are we running for static correlation (true) or spattemp corr (false)
-isStatic = globals.isStatic
+isStatic = int(sys.argv[4])
+
 # wavenumber for calculating the spattemp correlation
-corrCalcK = globals.corrCalcK
+corrCalcK = float(sys.argv[5])
+
+# noise intensity
+eta = 0.45
+
+# neighbour radius
+r = 1.
+
+# time step
+t = 0
+delta_t = 1
+
+# maximum time steps
+if isStatic==1:
+    T = 10000*delta_t
+elif isStatic==0:
+    T = 100000*delta_t
+
+# velocity of particles
+vel = 0.05
+
 # the length of the dataset for the spattemp correlation (in units of time)
-timeLength = globals.timeLength
+timeLength = 150
+
 # the time at which to start the spattemp corr calculations (in ratio of T)
-corrCalcStart = globals.corrCalcStart
+corrCalcStart = 0.1*T
+"""END Sim Vars"""
 
 # initialise random particle positions
 particles = np.random.uniform(0,box_size,size=(N,3))
@@ -78,8 +81,6 @@ for i in range(N):
     updtQueue[i] = deque()
 """END INIT"""
 
-#@guvectorize(["void(float64[:,:], float64[:,:], float64[:,:], float64[:,:])"],\
-#              '(m, n), (m, n) -> (m, n), (m, n)')
 def timestep(particles, rand_vecs):
     # actual simulation timestep
     for i, (x, y, z) in enumerate(particles):
@@ -147,7 +148,7 @@ while t < T:
         timestepTime = time.time()
         
     # get all relative distances between particles before looking for neighbours
-    distances = get_all_distances(particles)
+    distances = get_all_distances(particles, box_size)
     
     """StatCorr"""
     # in the last 10% of the simulation time, start calculating the static
@@ -158,7 +159,7 @@ while t < T:
         if t >= (T - 0.1*T):
             start = time.time()
         
-            data = static_correlation(rand_vecs, particles, wavenums)
+            data = static_correlation(rand_vecs, particles, wavenums, box_size)
             
             statCorrTimeAvg += data
             counter = counter + 1
@@ -176,7 +177,7 @@ while t < T:
             print("Here we go")
             time_zero(particles, rand_vecs, t)
             statCorrNormalisation = spattemp_correlation(
-                    rand_vecs, particles, corrCalcK
+                    rand_vecs, particles, corrCalcK, box_size
                     )
             
         if t >= corrCalcStart:
@@ -186,7 +187,7 @@ while t < T:
                 if( corrIndex[1] < len(spatTempCorr) ):
                     spatTempCorr[corrIndex[1]][corrIndex[0]] =\
                         spattemp_correlation(
-                                rand_vecs, particles, corrCalcK
+                                rand_vecs, particles, corrCalcK, box_size
                                 ) / statCorrNormalisation
                     corrIndex[1] += 1
                 else:
@@ -195,7 +196,9 @@ while t < T:
                     print("Starting new dataset number {}".format(corrIndex[0]))
                     time_zero(particles, rand_vecs, t)
                     statCorrNormalisation =\
-                        spattemp_correlation(rand_vecs, particles, corrCalcK)
+                        spattemp_correlation(
+                                rand_vecs, particles, corrCalcK, box_size
+                                )
             	
     #np.savetxt("{0}.txt".format(t), output)#"simulation1/%.2f.txt" % t, output)
     ## save coordinates & angle vectors
@@ -246,7 +249,6 @@ else:
     if(isStatic==0):
         #plt.plot(range(len(spatTempCorr)), spatTempCorr)
         
-        print(spatTempCorr[:][:5])
         spatTempCorr = np.mean(spatTempCorr, axis=1)
         
         f=open("spatTempCorr_{0}_{1}_{5}delay_{4}_{3}steps_{2}.txt".format(

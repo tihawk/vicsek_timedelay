@@ -1,12 +1,5 @@
 import numpy as np
 from scipy.spatial.distance import cdist, pdist, squareform
-import globals
-
-#from numba import jit
-
-# not doing this removes the benefits from numba???
-globals.initialise()
-box_size = globals.box_size
 
 # list of values for the polarisation at times t (global)
 polarisation = []
@@ -34,7 +27,7 @@ def dim_vel_fluctuations(particleVectors):
     # of the periodic boundary conditions, the coordinates are first mapped
     # onto a circle (see wiki)
 #@jit
-def coords_wrt_centre_mass(particles):
+def coords_wrt_centre_mass(particles, box_size):
     theta = particles * 2*np.pi/box_size
     xi = np.cos(theta)
     zeta = np.sin(theta)
@@ -48,24 +41,24 @@ def coords_wrt_centre_mass(particles):
 # get a matrix lookup table of all distances between particles
     # Static Correlation
 #@jit
-def distance_touple_stat(particles):
-    particles = coords_wrt_centre_mass(particles)
+def distance_touple_stat(particles, box_size):
+    particles = coords_wrt_centre_mass(particles, box_size)
     return squareform(pdist(particles))
 
 # get a matrix lookup table of all distances between particles
     # Spatio-temporal Correlation
 #@jit
-def distance_touple(particles1, particles2):
-    particles1 = coords_wrt_centre_mass(particles1)
-    particles2 = coords_wrt_centre_mass(particles2)
+def distance_touple(particles1, particles2, box_size):
+    particles1 = coords_wrt_centre_mass(particles1, box_size)
+    particles2 = coords_wrt_centre_mass(particles2, box_size)
     return cdist(particles1, particles2)
 
 # static correlation function for a range of wavenumbers at time t
 #@jit
-def static_correlation(vectors, particles, kVal):    
+def static_correlation(vectors, particles, kVal, box_size):    
     N = len(particles)
     deltaV = dim_vel_fluctuations(vectors)
-    r_ij = distance_touple_stat(particles)
+    r_ij = distance_touple_stat(particles, box_size)
     
     statCorr = np.zeros(len(kVal))
     dVTensor = np.array([deltaV]*N)
@@ -73,6 +66,7 @@ def static_correlation(vectors, particles, kVal):
     
     for ind, wn in enumerate(kVal):
         kr = wn*r_ij
+        # sin(x)/x -> 1 as x -> 0
         checkZero = np.where(kr>0, np.sin(kr)/kr, 1)
         temp = checkZero*dottedDV
         temp = temp[~np.isnan(temp)]
@@ -94,16 +88,18 @@ def time_zero(particles, vectors, t):
     
 # spatio-temporal correlation function for wavenumber k at time t (not normalised)
 #@jit
-def spattemp_correlation(vectors, particles, k):    
+def spattemp_correlation(vectors, particles, k, box_size):    
     N = len(particles)
     deltaV = dim_vel_fluctuations(vectors)
-    r_ij = distance_touple(particles_t0, particles)
+    r_ij = distance_touple(particles_t0, particles, box_size)
     
     Corr = 0
     dottedDV = np.einsum('i...j,ij->i...', dimVelFluct3D_t0, deltaV)
     
     kr = k*r_ij
-    temp = np.sin(kr)*dottedDV/kr
+    # sin(x)/x -> 1 as x -> 0
+    checkZero = np.where(kr>0, np.sin(kr)/kr, 1)
+    temp = checkZero*dottedDV
     temp = temp[~np.isnan(temp)]
     Corr = np.sum(temp) / N
             
