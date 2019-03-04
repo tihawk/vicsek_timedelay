@@ -38,17 +38,24 @@ r = 1.
 t = 0
 delta_t = 1
 
+# the length of the dataset for the spattemp correlation (in units of time)
+timeLength = 200
+
 # maximum time steps
 if isStatic==1:
     T = 10000*delta_t
 elif isStatic==0:
-    T = 100000*delta_t
+    if timeDelay == 0:
+        T = 100000*delta_t
+        # the length of the dataset for the spattemp correlation (in units of time)
+        timeLength = 200
+    elif timeDelay > 0:
+        T = 200000*delta_t
+        # the length of the dataset for the spattemp correlation (in units of time)
+        timeLength = 500
 
 # velocity of particles
 vel = 0.05
-
-# the length of the dataset for the spattemp correlation (in units of time)
-timeLength = 150
 
 # the time at which to start the spattemp corr calculations (in ratio of T)
 corrCalcStart = 0.1*T
