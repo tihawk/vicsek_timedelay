@@ -1,9 +1,48 @@
 #!/usr/bin/python
 import numpy as np 
+from scipy.linalg import expm, norm
 #from scipy.spatial.distance import pdist, squareform, cdist
 from math import pi, sin, cos, sqrt
 
 from numba import jit
+
+import quaternion as quat
+
+# generate a noise vector inside a cone of angle nu*pi around the north pole
+# [1] https://stackoverflow.com/questions/38997302/create-random-unit-vector-inside-a-defined-conical-region
+@jit
+def get_noise_vectors(noiseWidth):
+    z = np.random.uniform() * (1 - cos(noiseWidth)) + cos(noiseWidth)
+    phi = np.random.uniform() * 2 * np.pi
+    x = sqrt(1 - z**2) * cos( phi )
+    y = sqrt(1 - z**2) * sin( phi )
+    
+    return [x, y, z]   
+
+# rotate the generated noise vector to the axis of the particle vector
+# [2] https://stackoverflow.com/questions/6802577/rotation-of-3d-vector
+def noise_application(noiseVec, vector):
+    
+    # rotation axis
+#    pole = np.array([0, 0, 1])
+    vector = vector/ sqrt(vector[0]**2 + vector[1]**2 + vector[2]**2)
+    u =  np.cross([0, 0, 1], vector)
+    #u = u/norm(u)
+    # rotation angle
+    rotTheta = np.arccos(np.dot(vector, [0, 0, 1]))
+    #prepare rot angle for quaternion
+    axisAngle = 0.5*rotTheta * u / sqrt(u[0]**2 + u[1]**2 + u[2]**2)
+    # rotation matrix
+    #M = expm( np.cross( np.eye(3), u * rotTheta ) )
+    
+    vec = quat.quaternion(*noiseVec)
+    qlog = quat.quaternion(*axisAngle)
+    q = np.exp(qlog)
+    
+    vPrime = q * vec * np.conjugate(q)
+    
+    return vPrime.imag
+    
 
 # generate random angle theta between -pi - pi
 def rand_vector():
@@ -12,23 +51,9 @@ def rand_vector():
     x = cos(theta) * sqrt(1 - z**2)
     y = sin(theta) * sqrt(1 - z**2)
     return np.array([x,y,z])
-    
-#@jit("float64(float64[:], float64[:])")
-#def wrapped_euclidean_points(p, q):
-#    diff = np.abs(p - q)
-#    diff = diff - np.rint(diff / box_size) * box_size
-#    return np.sqrt(diff[0]**2 + diff[1]**2 + diff[2]**2)
-#
-#@jit("float64[:](float64[:])")
-# generate a lookup matrix table of distances between particles at time t
-#def get_all_distances(particles):
-#    distances = pdist(particles)
-#    # NOTE: I don't know why, but squareform is faster than condensed
-#    distances = squareform(distances)
-##    distances = cdist(particles, particles, metric=wrapped_euclidean_points)
-#    return distances
 
 #@guvectorize(['float64[:,:], float64[:,:]'], '(m, n) -> (m, m)')
+# [3] https://en.wikipedia.org/wiki/Periodic_boundary_conditions#(A)_Restrict_particle_coordinates_to_the_simulation_box
 @jit
 def get_all_distances(ps, box_size):
     m = ps.shape[0]

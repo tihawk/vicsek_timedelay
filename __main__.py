@@ -3,7 +3,7 @@ import sys
 import numpy as np
 from collections import deque
 from geometry3d import rand_vector, get_all_distances\
-     ,get_neighbours, get_average
+     ,get_neighbours, get_average, noise_application, get_noise_vectors
 from correlation import static_correlation, spattemp_correlation,\
      time_zero, polarisation, susceptibility, criticality_x
 import time
@@ -38,12 +38,15 @@ r = 1.
 t = 0
 delta_t = 1
 
+# the length of the dataset for the static correlation (in units of time)
+staticTimeLength = 1000
+
 # the length of the dataset for the spattemp correlation (in units of time)
 timeLength = 200
 
 # maximum time steps
 if isStatic==1:
-    T = 10000*delta_t
+    T = 20000*delta_t
 elif isStatic==0:
     if timeDelay == 0:
         T = 100000*delta_t
@@ -61,6 +64,9 @@ vel = 0.05
 corrCalcStart = 0.1*T
 """END Sim Vars"""
 
+# make noise equilibration
+noiseWidth = eta*np.pi
+
 # initialise random particle positions
 particles = np.random.uniform(0,box_size,size=(N,3))
 
@@ -69,6 +75,8 @@ rand_vecs = np.zeros((N,3))
 for i in range(0,N):
     vec = rand_vector()
     rand_vecs[i,:] = vec
+    
+noiseVecs = np.zeros((N, 3))
     
 # init static correlation time average
 wavenums = np.linspace(0., 1.5, num=35)
@@ -87,8 +95,10 @@ updtQueue = np.zeros((N), dtype=deque)
 for i in range(N):
     updtQueue[i] = deque()
 """END INIT"""
+    
 
 def timestep(particles, rand_vecs):
+    
     # actual simulation timestep
     for i, (x, y, z) in enumerate(particles):
         # get neighbor indices for current particle
@@ -97,16 +107,13 @@ def timestep(particles, rand_vecs):
         # get average theta vector
         avg = get_average(rand_vecs, neighbours)
     
-        # get noise vector
-        noise = eta*rand_vector()#np.random.uniform(0, eta) * rand_vector()
+        # get noise vector from a uniform random distribution inside solid angle 4pi*eta
+        noiseVecs[i] = get_noise_vectors(noiseWidth)
         
-        # calculate the new unit vector for the particle, taking into account
-        # the noise, and of course - normalisation
-        avgAndNoise = avg + noise
-        try:
-            new_dir = ( (avgAndNoise) / np.linalg.norm(avgAndNoise) )
-        except:
-            print("AHA!!!")
+        # apply the noise vector by rotating it to the axis of the particle vector
+        new_dir = noise_application(noiseVecs[i], avg)
+        
+        #NOTE: ^^^ PLEASE FOR CRYING OUT LOUD MAKE THIS FASTER!!!1 ^^^
         
         # add new unit vector to queue for current particle
         updtQueue[i].append(new_dir)
@@ -163,7 +170,37 @@ while t < T:
     # build up an average. Meanwhile get the nearest neighbour distance at
     # time t. Later that will be averaged out as well.
     if(isStatic==1):
-        if t >= (T - 0.1*T):
+        if t >= (T - 0.5*T - 1):
+            if (counter == staticTimeLength):
+                # if a length of the dataset is acquired, here the results are
+                # averaged and outputted in a file. the new dataset starts at
+                # the same timestep
+                print("Starting new Dataset")
+                
+                statCorrTimeAvg = statCorrTimeAvg / counter
+                
+                f=open("statCorr_{0}_{1}_{4}delay_{3}steps_{2}.txt".format(
+                        N, box_size, time.time(), T, timeDelay),'ba'
+                    )
+                output = np.concatenate((wavenums, statCorrTimeAvg),axis=0)
+                np.savetxt(f,output)
+                f.close()
+                
+                susc = susceptibility(statCorrTimeAvg)
+                critX = critX / counter
+                print("susc: {}. x: {}".format(susc, critX))
+                
+                f=open("{0}_{1}_{4}delay_{3}steps_{2}.txt".format(
+                        N, box_size, time.time(), T, timeDelay),'ba'
+                    )
+                output = np.array([susc, critX])
+                np.savetxt(f,output)
+                f.close()
+                
+                statCorrTimeAvg = 0
+                critX = 0
+                counter = 0
+                
             start = time.time()
         
             data = static_correlation(rand_vecs, particles, wavenums, box_size)
@@ -223,26 +260,28 @@ else:
     # the susceptibility (defined as the maximum of the static correlation) and
     # nearest neighbour distance, will be averaged, saved and printed as well.
     # the polarisation will be printed as well
-    if(isStatic==1):
-        statCorrTimeAvg = statCorrTimeAvg / counter
-        
-        f=open("statCorr_{0}_{1}_{4}delay_{3}steps_{2}.txt".format(
-                N, box_size, time.time(), T, timeDelay),'ba'
-            )
-        output = np.concatenate((wavenums, statCorrTimeAvg),axis=0)
-        np.savetxt(f,output)
-        f.close()
-        
-        susc = susceptibility(statCorrTimeAvg)
-        critX = critX / counter
-        print("susc: {}. x: {}".format(susc, critX))
-        
-        f=open("{0}_{1}_{4}delay_{3}steps_{2}.txt".format(
-                N, box_size, time.time(), T, timeDelay),'ba'
-            )
-        output = np.array([susc, critX])
-        np.savetxt(f,output)
-        f.close()
+    # NOTE: Moved this up into the loop, so that more datasets can be saved
+    # during simulation time
+#    if(isStatic==1):
+#        statCorrTimeAvg = statCorrTimeAvg / counter
+#        
+#        f=open("statCorr_{0}_{1}_{4}delay_{3}steps_{2}.txt".format(
+#                N, box_size, time.time(), T, timeDelay),'ba'
+#            )
+#        output = np.concatenate((wavenums, statCorrTimeAvg),axis=0)
+#        np.savetxt(f,output)
+#        f.close()
+#        
+#        susc = susceptibility(statCorrTimeAvg)
+#        critX = critX / counter
+#        print("susc: {}. x: {}".format(susc, critX))
+#        
+#        f=open("{0}_{1}_{4}delay_{3}steps_{2}.txt".format(
+#                N, box_size, time.time(), T, timeDelay),'ba'
+#            )
+#        output = np.array([susc, critX])
+#        np.savetxt(f,output)
+#        f.close()
         
 #        plt.plot(wavenums, statCorrTimeAvg)
 #        plt.show()
