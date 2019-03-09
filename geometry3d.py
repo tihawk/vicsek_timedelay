@@ -10,19 +10,30 @@ import quaternion as quat
 
 # generate a noise vector inside a cone of angle nu*pi around the north pole
 # [1] https://stackoverflow.com/questions/38997302/create-random-unit-vector-inside-a-defined-conical-region
-@jit
-def get_noise_vectors(noiseWidth):
-    z = np.random.uniform() * (1 - cos(noiseWidth)) + cos(noiseWidth)
-    phi = np.random.uniform() * 2 * np.pi
-    x = sqrt(1 - z**2) * cos( phi )
-    y = sqrt(1 - z**2) * sin( phi )
-    
-    return [x, y, z]   
+#@jit(nopython=True)
+#def get_noise_vectors(noiseWidth, N):
+#    vecs = np.zeros((N, 3))
+#    
+#    for i in range(N):
+#        z = np.random.uniform(0., 1.) * (1 - cos(noiseWidth)) + cos(noiseWidth)
+#        phi = np.random.uniform(0., 1.) * 2 * np.pi
+#        x = sqrt(1 - z**2) * cos( phi )
+#        y = sqrt(1 - z**2) * sin( phi )
+#        vecs[i] = [x, y, z]
+#    
+#    return vecs
 
 # rotate the generated noise vector to the axis of the particle vector
 # [2] https://stackoverflow.com/questions/6802577/rotation-of-3d-vector
-def noise_application(noiseVec, vector):
+def noise_application(noiseWidth, vector):
     
+    # Generate a random vector in solid angle 4*pi*nu around north pole
+    z = np.random.uniform(0., 1.) * (1 - cos(noiseWidth)) + cos(noiseWidth)
+    phi = np.random.uniform(0., 1.) * 2 * np.pi
+    x = sqrt(1 - z**2) * cos( phi )
+    y = sqrt(1 - z**2) * sin( phi )
+    
+    #Rotate the noise vector to be in a cone around the directional vector
     # rotation axis
 #    pole = np.array([0, 0, 1])
     vector = vector/ sqrt(vector[0]**2 + vector[1]**2 + vector[2]**2)
@@ -35,7 +46,7 @@ def noise_application(noiseVec, vector):
     # rotation matrix
     #M = expm( np.cross( np.eye(3), u * rotTheta ) )
     
-    vec = quat.quaternion(*noiseVec)
+    vec = quat.quaternion(x, y, z)
     qlog = quat.quaternion(*axisAngle)
     q = np.exp(qlog)
     
@@ -54,7 +65,7 @@ def rand_vector():
 
 #@guvectorize(['float64[:,:], float64[:,:]'], '(m, n) -> (m, m)')
 # [3] https://en.wikipedia.org/wiki/Periodic_boundary_conditions#(A)_Restrict_particle_coordinates_to_the_simulation_box
-@jit
+@jit(nopython=True)
 def get_all_distances(ps, box_size):
     m = ps.shape[0]
     res = np.zeros((m, m))
@@ -67,7 +78,7 @@ def get_all_distances(ps, box_size):
             dx = dx - np.rint(dx/box_size) * box_size
             dy = dy - np.rint(dy/box_size) * box_size
             dz = dz - np.rint(dz/box_size) * box_size
-            res[i, j] = (dx**2 + dy**2 + dz**2)**0.5
+            res[i, j] = (dx*dx + dy*dy + dz*dz)**0.5
 
             
     return res
@@ -76,25 +87,23 @@ def get_all_distances(ps, box_size):
 
 # returns a list of indices for all neighbours
 # includes itself as a neighor so it will be included in average
-@jit()
-def get_neighbours(distances, r, index):
-    neighbours = []
-
-    for j, dist in enumerate(distances[index]):
-        if dist < r:
-            neighbours.append(j)
-
-    return neighbours
-
-# average unit vectors for all angles
-# return average angle 
-@jit
-def get_average(rand_vecs, neighbours):
-	
-    n_neighbours = len(neighbours)
-    avg_vector = np.zeros(3)
-    vec = rand_vecs[neighbours]
-    avg_vector = np.sum(vec, axis=0)
-    avg_vector = avg_vector / n_neighbours
-
-    return avg_vector
+#@jit(nopython=True)
+#def get_neighbours(distances, r, index):
+#    neighbours = []
+#
+#    for j, dist in enumerate(distances[index]):
+#        if dist < r:
+#            neighbours.append(j)
+#
+#    return neighbours
+#
+## average unit vectors for all angles
+## return average angle 
+#@jit
+#def get_average(rand_vecs, neighbours):
+#    
+#    vec = rand_vecs[neighbours]
+#    avg_vector = np.mean(vec, axis=0)
+#    print(avg_vector)
+#
+#    return avg_vector

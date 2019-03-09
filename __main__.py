@@ -2,8 +2,7 @@
 import sys
 import numpy as np
 from collections import deque
-from geometry3d import rand_vector, get_all_distances\
-     ,get_neighbours, get_average, noise_application, get_noise_vectors
+from geometry3d import rand_vector, get_all_distances, noise_application
 from correlation import static_correlation, spattemp_correlation,\
      time_zero, polarisation, susceptibility, criticality_x
 import time
@@ -79,7 +78,10 @@ for i in range(0,N):
 noiseVecs = np.zeros((N, 3))
     
 # init static correlation time average
-wavenums = np.linspace(0., 1.5, num=35)
+if N < 128:
+    wavenums = np.linspace(0., 2.0, num=45)
+else:
+    wavenums = np.linspace(0., 1.5, num=35)
 statCorrTimeAvg = np.zeros(len(wavenums))
 critX = 0
 counter = 0
@@ -95,23 +97,26 @@ updtQueue = np.zeros((N), dtype=deque)
 for i in range(N):
     updtQueue[i] = deque()
 """END INIT"""
-    
 
 def timestep(particles, rand_vecs):
+
+#    noiseVecs = get_noise_vectors(noiseWidth, N)
     
     # actual simulation timestep
     for i, (x, y, z) in enumerate(particles):
         # get neighbor indices for current particle
-        neighbours = get_neighbours(distances, r, i)
+#        neighbours = get_neighbours(distances, r, i)
+        neighbours = np.where(distances[i]<r)
     
-        # get average theta vector
-        avg = get_average(rand_vecs, neighbours)
+        # get average direction vector of neighbours
+#        avg = get_average(rand_vecs, neighbours[0])
+        avg = np.mean(rand_vecs[neighbours[0]], axis=0)
     
         # get noise vector from a uniform random distribution inside solid angle 4pi*eta
-        noiseVecs[i] = get_noise_vectors(noiseWidth)
+        #noiseVecs[i] = get_noise_vectors(noiseWidth)
         
         # apply the noise vector by rotating it to the axis of the particle vector
-        new_dir = noise_application(noiseVecs[i], avg)
+        new_dir = noise_application(noiseWidth, avg)
         
         #NOTE: ^^^ PLEASE FOR CRYING OUT LOUD MAKE THIS FASTER!!!1 ^^^
         
@@ -170,7 +175,7 @@ while t < T:
     # build up an average. Meanwhile get the nearest neighbour distance at
     # time t. Later that will be averaged out as well.
     if(isStatic==1):
-        if t >= (T - 0.5*T - 1):
+        if t >= 9999:#>= (T - 0.5*T - 1):
             if (counter == staticTimeLength):
                 # if a length of the dataset is acquired, here the results are
                 # averaged and outputted in a file. the new dataset starts at
