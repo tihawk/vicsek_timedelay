@@ -60,18 +60,24 @@ def static_correlation(vectors, particles, kVal, box_size):
     deltaV = dim_vel_fluctuations(vectors)
     r_ij = distance_touple_stat(particles, box_size)
     
-    statCorr = np.zeros(len(kVal))
+#    statCorr = np.zeros(len(kVal))
     dVTensor = np.array([deltaV]*N)
     dottedDV = np.einsum('i...j,ij->i...', dVTensor, deltaV)
     
-    for ind, wn in enumerate(kVal):
-        kr = wn*r_ij
-        # sin(x)/x -> 1 as x -> 0
-        checkZero = np.where(kr>0, np.sin(kr)/kr, 1)
-        temp = checkZero*dottedDV
-        temp = temp[~np.isnan(temp)]
-        statCorr[ind] = np.sum(temp) / N
-            
+    r_ijTensor = np.array([r_ij]*len(kVal))
+    krTensor = np.einsum('i...j,i->i...j', r_ijTensor, kVal)
+    checkZero = np.where(krTensor>0, np.sin(krTensor)/krTensor, 1)
+    temp = np.einsum('...ij,ij->...ij', checkZero, dottedDV)
+    statCorr = np.sum(temp, axis=(1, 2)) / N
+    
+#    for ind, wn in enumerate(kVal):
+#        kr = wn*r_ij
+#        # sin(x)/x -> 1 as x -> 0
+#        checkZero = np.where(kr>0, np.sin(kr)/kr, 1)
+#        temp = checkZero*dottedDV
+#        temp = temp[~np.isnan(temp)]
+#        statCorr[ind] = np.sum(temp) / N
+        
     return statCorr
 
 # get the positions and unit vectors of the particles at t_0 for the purpose
