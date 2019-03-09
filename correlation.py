@@ -13,9 +13,9 @@ time0 = 0
 #@jit
 def dim_vel_fluctuations(particleVectors):
 
-    global polarisation
+#    global polarisation
     avgVector = np.mean(particleVectors, axis=0)
-    polarisation.append(np.sqrt(np.dot(avgVector, avgVector)))
+#    polarisation.append(np.sqrt(np.dot(avgVector, avgVector)))
     velFluct = np.subtract(particleVectors, avgVector)
     sqAvgVelFluct = np.einsum('ij,ij->i', velFluct, velFluct)
     sqAvgVelFluct = np.mean(sqAvgVelFluct)

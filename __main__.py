@@ -99,11 +99,9 @@ for i in range(N):
 """END INIT"""
 
 def timestep(particles, rand_vecs):
-
-#    noiseVecs = get_noise_vectors(noiseWidth, N)
     
     # actual simulation timestep
-    for i, (x, y, z) in enumerate(particles):
+    for i in range(len(particles)):
         # get neighbor indices for current particle
 #        neighbours = get_neighbours(distances, r, i)
         neighbours = np.where(distances[i]<r)
@@ -113,8 +111,6 @@ def timestep(particles, rand_vecs):
         avg = np.mean(rand_vecs[neighbours[0]], axis=0)
     
         # get noise vector from a uniform random distribution inside solid angle 4pi*eta
-        #noiseVecs[i] = get_noise_vectors(noiseWidth)
-        
         # apply the noise vector by rotating it to the axis of the particle vector
         new_dir = noise_application(noiseWidth, avg)
         
@@ -126,33 +122,16 @@ def timestep(particles, rand_vecs):
         # if the queue is long enough, dequeue and change unit vector accordingly
         # otherwise continue on previous trajectory
         if(len(updtQueue[i]) > timeDelay):
-            newVec = updtQueue[i].popleft()
+            rand_vecs[i] = updtQueue[i].popleft()
             # move to new position 
-            particles[i,:] = particles[i,:] + delta_t * vel * newVec
-            # get new unit vector vector
-            rand_vecs[i] = newVec
+            particles[i,:] = particles[i,:] + delta_t * vel * rand_vecs[i]
         else:
             # move to new position using old unit vector
             particles[i,:] = particles[i,:] + delta_t * vel * rand_vecs[i]
-    
-        # assure correct boundaries (xmax,ymax) = (box_size, box_size)
-        if particles[i,0] < 0:
-            particles[i,0] = box_size + particles[i,0]
-    
-        if particles[i,0] > box_size:
-            particles[i,0] = particles[i,0] - box_size
-    
-        if particles[i,1] < 0:
-            particles[i,1] = box_size + particles[i,1]
-    
-        if particles[i,1] > box_size:
-            particles[i,1] = particles[i,1] - box_size
-    
-        if particles[i,2] < 0:
-            particles[i,2] = box_size + particles[i,2]
-    
-        if particles[i,2] > box_size:
-            particles[i,2] = particles[i,2] - box_size
+        
+    # assure correct boundaries (xmax,ymax) = (box_size, box_size)
+    particles = np.where(particles < 0, particles + box_size, particles)
+    particles = np.where(particles > box_size, particles - box_size, particles)
 
 
 
@@ -221,18 +200,18 @@ while t < T:
     # amount of steps, after which a new dataset will be created, and the process
     # repeated. Later those will be averaged out.
     if(isStatic==0):
-        # get time zero vars for spattempcorr
-        if t == (corrCalcStart - delta_t):
-            print("Here we go")
-            time_zero(particles, rand_vecs, t)
-            statCorrNormalisation = spattemp_correlation(
-                    rand_vecs, particles, corrCalcK, box_size
-                    )
             
         if t >= corrCalcStart:
             # this construction will build up a few data sets of a set
-                # time length, which will be later averaged out            
+                # time length, which will be later averaged out           
             if( corrIndex[0] < len(spatTempCorr[0]) ):
+                # get time zero vars for spattempcorr
+                if( corrIndex[1] == 0 ):
+                    time_zero(particles, rand_vecs, t)
+                    statCorrNormalisation = spattemp_correlation(
+                            rand_vecs, particles, corrCalcK, box_size
+                            )
+                    
                 if( corrIndex[1] < len(spatTempCorr) ):
                     spatTempCorr[corrIndex[1]][corrIndex[0]] =\
                         spattemp_correlation(
@@ -243,11 +222,6 @@ while t < T:
                     corrIndex[1] = 0
                     corrIndex[0] += 1
                     print("Starting new dataset number {}".format(corrIndex[0]))
-                    time_zero(particles, rand_vecs, t)
-                    statCorrNormalisation =\
-                        spattemp_correlation(
-                                rand_vecs, particles, corrCalcK, box_size
-                                )
             	
     #np.savetxt("{0}.txt".format(t), output)#"simulation1/%.2f.txt" % t, output)
     ## save coordinates & angle vectors

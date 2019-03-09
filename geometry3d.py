@@ -10,19 +10,6 @@ import quaternion as quat
 
 # generate a noise vector inside a cone of angle nu*pi around the north pole
 # [1] https://stackoverflow.com/questions/38997302/create-random-unit-vector-inside-a-defined-conical-region
-#@jit(nopython=True)
-#def get_noise_vectors(noiseWidth, N):
-#    vecs = np.zeros((N, 3))
-#    
-#    for i in range(N):
-#        z = np.random.uniform(0., 1.) * (1 - cos(noiseWidth)) + cos(noiseWidth)
-#        phi = np.random.uniform(0., 1.) * 2 * np.pi
-#        x = sqrt(1 - z**2) * cos( phi )
-#        y = sqrt(1 - z**2) * sin( phi )
-#        vecs[i] = [x, y, z]
-#    
-#    return vecs
-
 # rotate the generated noise vector to the axis of the particle vector
 # [2] https://stackoverflow.com/questions/6802577/rotation-of-3d-vector
 def noise_application(noiseWidth, vector):
@@ -33,9 +20,9 @@ def noise_application(noiseWidth, vector):
     x = sqrt(1 - z**2) * cos( phi )
     y = sqrt(1 - z**2) * sin( phi )
     
-    #Rotate the noise vector to be in a cone around the directional vector
+    # Rotate the noise vector to be in a cone around the directional vector
     # rotation axis
-#    pole = np.array([0, 0, 1])
+    # pole = np.array([0, 0, 1])
     vector = vector/ sqrt(vector[0]**2 + vector[1]**2 + vector[2]**2)
     u =  np.cross([0, 0, 1], vector)
     #u = u/norm(u)
@@ -45,7 +32,7 @@ def noise_application(noiseWidth, vector):
     axisAngle = 0.5*rotTheta * u / sqrt(u[0]**2 + u[1]**2 + u[2]**2)
     # rotation matrix
     #M = expm( np.cross( np.eye(3), u * rotTheta ) )
-    
+    # Quaternion stuff - pretty fast, compared to other stuff...
     vec = quat.quaternion(x, y, z)
     qlog = quat.quaternion(*axisAngle)
     q = np.exp(qlog)
@@ -78,9 +65,7 @@ def get_all_distances(ps, box_size):
             dx = dx - np.rint(dx/box_size) * box_size
             dy = dy - np.rint(dy/box_size) * box_size
             dz = dz - np.rint(dz/box_size) * box_size
-            res[i, j] = (dx*dx + dy*dy + dz*dz)**0.5
-
-            
+            res[i, j] = sqrt(dx*dx + dy*dy + dz*dz)
     return res
 
 """NEIGHBOURS"""
