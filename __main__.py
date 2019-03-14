@@ -41,20 +41,21 @@ delta_t = 1
 staticTimeLength = 1000
 
 # the length of the dataset for the spattemp correlation (in units of time)
-timeLength = 200
+timeLength = 150
 
 # maximum time steps
 if isStatic==1:
     T = 20000*delta_t
 elif isStatic==0:
-    if timeDelay == 0:
-        T = 100000*delta_t
-        # the length of the dataset for the spattemp correlation (in units of time)
-        timeLength = 200
-    elif timeDelay > 0:
-        T = 200000*delta_t
-        # the length of the dataset for the spattemp correlation (in units of time)
-        timeLength = 500
+    T = 100000*delta_t
+#    if timeDelay == 0:
+#        T = 100000*delta_t
+#        # the length of the dataset for the spattemp correlation (in units of time)
+#        timeLength = 200
+#    elif timeDelay > 0:
+#        T = 200000*delta_t
+#        # the length of the dataset for the spattemp correlation (in units of time)
+#        timeLength = 500
 
 # velocity of particles
 vel = 0.05
@@ -99,6 +100,8 @@ for i in range(N):
 """END INIT"""
 
 def timestep(particles, rand_vecs):
+
+#    noiseVecs = get_noise_vectors(noiseWidth, N)
     
     # actual simulation timestep
     for i in range(len(particles)):
@@ -111,6 +114,8 @@ def timestep(particles, rand_vecs):
         avg = np.mean(rand_vecs[neighbours[0]], axis=0)
     
         # get noise vector from a uniform random distribution inside solid angle 4pi*eta
+        #noiseVecs[i] = get_noise_vectors(noiseWidth)
+        
         # apply the noise vector by rotating it to the axis of the particle vector
         new_dir = noise_application(noiseWidth, avg)
         
@@ -122,16 +127,36 @@ def timestep(particles, rand_vecs):
         # if the queue is long enough, dequeue and change unit vector accordingly
         # otherwise continue on previous trajectory
         if(len(updtQueue[i]) > timeDelay):
-            rand_vecs[i] = updtQueue[i].popleft()
+            newVec = updtQueue[i].popleft()
             # move to new position 
-            particles[i,:] = particles[i,:] + delta_t * vel * rand_vecs[i]
+            particles[i,:] = particles[i,:] + delta_t * vel * newVec
+            # get new unit vector vector
+            rand_vecs[i] = newVec
         else:
             # move to new position using old unit vector
             particles[i,:] = particles[i,:] + delta_t * vel * rand_vecs[i]
-        
-    # assure correct boundaries (xmax,ymax) = (box_size, box_size)
-    particles = np.where(particles < 0, particles + box_size, particles)
-    particles = np.where(particles > box_size, particles - box_size, particles)
+    
+        # assure correct boundaries (xmax,ymax) = (box_size, box_size)
+        if particles[i,0] < 0:
+            particles[i,0] = box_size + particles[i,0]
+    
+        if particles[i,0] > box_size:
+            particles[i,0] = particles[i,0] - box_size
+    
+        if particles[i,1] < 0:
+            particles[i,1] = box_size + particles[i,1]
+    
+        if particles[i,1] > box_size:
+            particles[i,1] = particles[i,1] - box_size
+    
+        if particles[i,2] < 0:
+            particles[i,2] = box_size + particles[i,2]
+    
+        if particles[i,2] > box_size:
+            particles[i,2] = particles[i,2] - box_size
+            
+#    particles = np.where(particles < 0, particles + box_size, particles)
+#    particles = np.where(particles > box_size, particles - box_size, particles)
 
 
 
