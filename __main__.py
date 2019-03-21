@@ -69,6 +69,7 @@ noiseWidth = eta*np.pi
 
 # initialise random particle positions
 particles = np.random.uniform(0,box_size,size=(N,3))
+updatePos = particles
 
 # initialise random unit vectors in 3D
 rand_vecs = np.zeros((N,3))
@@ -77,6 +78,7 @@ for i in range(0,N):
     rand_vecs[i,:] = vec
     
 noiseVecs = np.zeros((N, 3))
+updateVecs = rand_vecs
     
 # init static correlation time average
 if N < 128:
@@ -100,65 +102,62 @@ for i in range(N):
 """END INIT"""
 
 def timestep(particles, rand_vecs):
-
-#    noiseVecs = get_noise_vectors(noiseWidth, N)
     
     # actual simulation timestep
     for i in range(len(particles)):
         # get neighbor indices for current particle
-#        neighbours = get_neighbours(distances, r, i)
         neighbours = np.where(distances[i]<r)
+        neighbours = neighbours[0][ np.where( neighbours[0] != i ) ]
     
         # get average direction vector of neighbours
-#        avg = get_average(rand_vecs, neighbours[0])
-        avg = np.mean(rand_vecs[neighbours[0]], axis=0)
-    
-        # get noise vector from a uniform random distribution inside solid angle 4pi*eta
-        #noiseVecs[i] = get_noise_vectors(noiseWidth)
+        #avg = np.mean(rand_vecs[neighbours], axis=0) if len(neighbours)>0 \
+        #    else np.array([0, 0, 0])
+        neighsDirs = rand_vecs[neighbours]
         
         # apply the noise vector by rotating it to the axis of the particle vector
-        new_dir = noise_application(noiseWidth, avg)
+        
         
         #NOTE: ^^^ PLEASE FOR CRYING OUT LOUD MAKE THIS FASTER!!!1 ^^^
         
         # add new unit vector to queue for current particle
-        updtQueue[i].append(new_dir)
+        updtQueue[i].append(neighsDirs)
         
         # if the queue is long enough, dequeue and change unit vector accordingly
         # otherwise continue on previous trajectory
         if(len(updtQueue[i]) > timeDelay):
-            newVec = updtQueue[i].popleft()
+            neighsDirs = updtQueue[i].popleft()
+            avg = np.mean([rand_vecs[i], *neighsDirs], axis=0)
+            #print(avg)
+            newVec = noise_application(noiseWidth, avg)
             # move to new position 
-            particles[i,:] = particles[i,:] + delta_t * vel * newVec
+            updatePos[i,:] = updatePos[i,:] + delta_t * vel * newVec
             # get new unit vector vector
-            rand_vecs[i] = newVec
+            updateVecs[i] = newVec
         else:
             # move to new position using old unit vector
-            particles[i,:] = particles[i,:] + delta_t * vel * rand_vecs[i]
+            updatePos[i,:] = updatePos[i,:] + delta_t * vel * rand_vecs[i]
     
         # assure correct boundaries (xmax,ymax) = (box_size, box_size)
-        if particles[i,0] < 0:
-            particles[i,0] = box_size + particles[i,0]
+        if updatePos[i,0] < 0:
+            updatePos[i,0] = box_size + updatePos[i,0]
     
-        if particles[i,0] > box_size:
-            particles[i,0] = particles[i,0] - box_size
+        if updatePos[i,0] > box_size:
+            updatePos[i,0] = updatePos[i,0] - box_size
     
-        if particles[i,1] < 0:
-            particles[i,1] = box_size + particles[i,1]
+        if updatePos[i,1] < 0:
+            updatePos[i,1] = box_size + updatePos[i,1]
     
-        if particles[i,1] > box_size:
-            particles[i,1] = particles[i,1] - box_size
+        if updatePos[i,1] > box_size:
+            updatePos[i,1] = updatePos[i,1] - box_size
     
-        if particles[i,2] < 0:
-            particles[i,2] = box_size + particles[i,2]
+        if updatePos[i,2] < 0:
+            updatePos[i,2] = box_size + updatePos[i,2]
     
-        if particles[i,2] > box_size:
-            particles[i,2] = particles[i,2] - box_size
+        if updatePos[i,2] > box_size:
+            updatePos[i,2] = updatePos[i,2] - box_size
             
-#    particles = np.where(particles < 0, particles + box_size, particles)
-#    particles = np.where(particles > box_size, particles - box_size, particles)
-
-
+    particles = updatePos
+    rand_vecs = updateVecs
 
 """TIMESTEP AND THINGS TO DO WHEN VISITING"""    
 # Run until time ends
