@@ -38,7 +38,6 @@ def noise_application(noiseWidth, vector):
     
     return vPrime.imag
     
-
 # generate random angle theta between -pi - pi
 def rand_vector():
     theta = np.random.uniform(0,2*pi)
@@ -47,7 +46,6 @@ def rand_vector():
     y = sin(theta) * sqrt(1 - z**2)
     return np.array([x,y,z])
 
-#@guvectorize(['float64[:,:], float64[:,:]'], '(m, n) -> (m, m)')
 # [3] https://en.wikipedia.org/wiki/Periodic_boundary_conditions#(A)_Restrict_particle_coordinates_to_the_simulation_box
 @jit(nopython=True)
 def get_all_distances(ps, box_size):
@@ -64,28 +62,3 @@ def get_all_distances(ps, box_size):
             dz = dz - np.rint(dz/box_size) * box_size
             res[i, j] = sqrt(dx*dx + dy*dy + dz*dz)
     return res
-
-"""NEIGHBOURS"""
-
-# returns a list of indices for all neighbours
-# includes itself as a neighor so it will be included in average
-#@jit(nopython=True)
-#def get_neighbours(distances, r, index):
-#    neighbours = []
-#
-#    for j, dist in enumerate(distances[index]):
-#        if dist < r:
-#            neighbours.append(j)
-#
-#    return neighbours
-#
-## average unit vectors for all angles
-## return average angle 
-#@jit
-#def get_average(rand_vecs, neighbours):
-#    
-#    vec = rand_vecs[neighbours]
-#    avg_vector = np.mean(vec, axis=0)
-#    print(avg_vector)
-#
-#    return avg_vector

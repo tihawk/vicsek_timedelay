@@ -18,6 +18,8 @@ allDeltaVs = [[None]]*200000
 # calculate the dimensionless velocity fluctuations used in corr calculations
 def dim_vel_fluctuations(particlesT, particlesT_1, box_size):
     
+    # without taking into account swarm rotation and dilation:
+    
 #    vecs = subtract_with_PB(particlesT, particlesT_1, box_size)
 #    MV = np.mean(vecs, axis=0)
 #    print(MV)
@@ -25,6 +27,8 @@ def dim_vel_fluctuations(particlesT, particlesT_1, box_size):
 #    sqAvgVelFluct1 = np.einsum('ij,ij->i', velFluct1, velFluct1)
 #    sqAvgVelFluct1 = np.mean(sqAvgVelFluct1)
 #    dimVelFluct1 = velFluct1 / np.sqrt(sqAvgVelFluct1)
+    
+    # using a Procrustes algorithm to take into account swarm rotation and dilation:
 
     pT = unravel_pbc(particlesT_1, particlesT, box_size)
     rsmd, proT, matrix = procrustes(particlesT_1, pT, box_size, reflection=False)
@@ -89,6 +93,7 @@ def procrustes(X, Y, box_size, scaling=True, reflection='best'):
 #    X0 = X - muX
 #    Y0 = Y - muY
     
+    # a funky centre of mass calculation, required by periodic boundary conditions
     X0, muX = coords_wrt_centre_mass(X, box_size, bounded=False)
     Y0t, muYt = coords_wrt_centre_mass(Y, box_size, bounded=False)
     muY = unravel_pbc(np.asarray([muX]), np.asarray([muYt]), box_size)[0]
@@ -114,16 +119,16 @@ def procrustes(X, Y, box_size, scaling=True, reflection='best'):
     V = Vt.T
     T = np.dot(V, U.T)
 
-#    if reflection is not 'best':
-#
-#        # does the current solution use a reflection?
-#        have_reflection = np.linalg.det(T) < 0
-#
-#        # if that's not what was specified, force another reflection
-#        if reflection != have_reflection:
-#            V[:,-1] *= -1
-#            s[-1] *= -1
-#            T = np.dot(V, U.T)
+    if reflection is not 'best':
+
+        # does the current solution use a reflection?
+        have_reflection = np.linalg.det(T) < 0
+
+        # if that's not what was specified, force another reflection
+        if reflection != have_reflection:
+            V[:,-1] *= -1
+            s[-1] *= -1
+            T = np.dot(V, U.T)
 
     traceTA = s.sum()
 
@@ -168,16 +173,6 @@ def unravel_pbc(ps1, ps2, box_size):
             if (dx <= -box_size * 0.5):
                 res[i, j] -= box_size
     return res
-
-# removes diagonal elements of an array, in case i=/=j is important
-def remove_diagonal(A):
-    
-    m = A.shape[0]
-    strided = np.lib.stride_tricks.as_strided
-    s0,s1 = A.strides
-    out = strided(A.ravel()[1:], shape=(m-1,m), strides=(s0+s1,s1)).reshape(m,-1)
-    
-    return out
 
 # correct subtraction of positions under periodic boundary conditions
 @jit(nopython=True)
@@ -256,35 +251,29 @@ def coords_wrt_centre_mass(particles, box_size, bounded=True):
     cM = box_size*theta/(2*np.pi)   
     
     # apply cM simply by subtracting. this will result in an asymmetric
-    # distribution of the particles, but that doesn't matter for distance
-    # calculations, because of subtract_with_PB. It is important however for
+    # distribution of the particles. It is used for
     # the correct application of the Procrustes algorithm.
-    #apply_new_cm(ps, cM, box_size)
     
     if bounded:
         return apply_new_cm(ps, cM, box_size)
     else:
         return ps-cM, cM
     
-
 # get a matrix lookup table of all distances between particles
     # Static Correlation
-#@jit
 def distance_touple_stat(particles, box_size):
     particlesCM = coords_wrt_centre_mass(particles, box_size)
-    return  get_all_distances(particlesCM, particlesCM, box_size) #squareform(pdist(particles))
+    return  get_all_distances(particlesCM, particlesCM, box_size)
 
 # get a matrix lookup table of all distances between particles
     # Spatio-temporal Correlation
-#@jit
 def distance_touple(particles1, particles2, box_size):
     particles1CM = coords_wrt_centre_mass(particles1, box_size)
     particles2CM = coords_wrt_centre_mass(particles2, box_size)
     
-    return get_all_distances(particles1CM, particles2CM, box_size) #cdist(particles1CM, particles2CM)
+    return get_all_distances(particles1CM, particles2CM, box_size)
 
 # static correlation function for a range of wavenumbers at time t
-#@jit
 def static_correlation(prevPos, particles, kVal, box_size):    
     N = len(particles)
     deltaV = dim_vel_fluctuations(particles, prevPos, box_size)
@@ -305,25 +294,26 @@ def static_correlation(prevPos, particles, kVal, box_size):
 # get the positions and unit vectors of the particles at t_0 for the purpose
     #of calculating the static correlation with which to normalise the
     #spatio-temporal correlation
-#@jit
 def time_zero(prevPos, particles, t, box_size):
     global particles_t0, prevPos_t0, time0
     time0 = t
     particles_t0 = particles.copy()
     prevPos_t0 = prevPos.copy()
     
-#@jit
 def spattemp_correlation(prevPos, particles, k, box_size, timeI): 
     global particles_t0, prevPos_t0, time0, allDeltaVs_t0, allDeltaVs
     
     N = len(particles)
     
+    # check if dimentional velocity fluctiuations for given particle positions
+    # already exist in the lookup table
     if allDeltaVs_t0[time0][0] is None:
         allDeltaVs_t0[time0] = dim_vel_fluctuations(particles_t0, prevPos_t0, box_size)
     if allDeltaVs[timeI][0] is None:
         allDeltaVs[timeI] = dim_vel_fluctuations(particles, prevPos, box_size)
-    deltaV_t0 = allDeltaVs_t0[time0]#dim_vel_fluctuations(particles_t0, prevPos_t0, box_size)
-    deltaV = allDeltaVs[timeI]#dim_vel_fluctuations(particles, prevPos, box_size)
+        
+    deltaV_t0 = allDeltaVs_t0[time0]
+    deltaV = allDeltaVs[timeI]
     r_ij = distance_touple(prevPos_t0, prevPos, box_size)
     
     #r_ij = remove_diagonal(r_ij)
@@ -342,6 +332,7 @@ def spattemp_correlation(prevPos, particles, k, box_size, timeI):
 
 """ ADDITIONAL """
 
+# clear lookup tables for new simulation data
 def clearMem():
     global particles_t0, prevPos_t0, time0, allDeltaVs_t0, allDeltaVs
     particles_t0 = []
@@ -350,10 +341,15 @@ def clearMem():
     allDeltaVs_t0 = [[None]]*20000
     allDeltaVs = [[None]]*200000
     
-def clearMemDeltaVs():
-    global allDeltaVs
+# removes diagonal elements of an array, in case i=/=j is important
+def remove_diagonal(A):
     
-    allDeltaVs = [[None]]*200000
+    m = A.shape[0]
+    strided = np.lib.stride_tricks.as_strided
+    s0,s1 = A.strides
+    out = strided(A.ravel()[1:], shape=(m-1,m), strides=(s0+s1,s1)).reshape(m,-1)
+    
+    return out
 
 # get susceptibility defined as the maximum of the static correlation function
 def susceptibility(statCorr):
