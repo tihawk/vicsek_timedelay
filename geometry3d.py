@@ -1,11 +1,8 @@
 #!/usr/bin/python
-import numpy as np 
-from scipy.linalg import expm, norm
-#from scipy.spatial.distance import pdist, squareform, cdist
+from __future__ import division
+import numpy as np
 from math import pi, sin, cos, sqrt
-
 from numba import jit
-
 import quaternion as quat
 
 # generate a noise vector inside a cone of angle nu*pi around the north pole
