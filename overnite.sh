@@ -8,7 +8,7 @@
 # =================================================
 
 # directory with scripts
-HOME=/D/DevelopiNation/thesis/vicsek_timedelay
+HOME="$(cd "$(dirname "$0")"; pwd)"
 
 # index of the variables
 #N=$1
@@ -16,7 +16,7 @@ HOME=/D/DevelopiNation/thesis/vicsek_timedelay
 #dt=$3
 
 # make directory for current simulation
-# NOTE: puts everything in a "HOME/sortme" folder
+# NOTE: change the folder to save to manually!
 folder="particles/1delay"
 #folder="sortme/0.5delay"
 mkdir $folder

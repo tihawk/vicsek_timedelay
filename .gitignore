@@ -108,7 +108,17 @@ static_corr_nodelay
 spattemp_corr_nodelay
 static_corr_delay
 spattemp_corr_delay
-simulation2
-plots
 analysis.ods
 overnite.sh
+.matplotlib/
+analyser_run (2).ipynb
+overday.sh
+overnite2.sh
+particles/
+sortme/
+spattemp_corr_0.5delay/
+spattemp_corr_2delay/
+spattemps/
+static_corr_0.5delay/
+static_corr_2delay/
+suscies/
