@@ -2,13 +2,13 @@
 import numpy as np
 import os
 from correlation import static_correlation, spattemp_correlation,\
-     time_zero, criticality_x, clearMem
+     time_zero, criticality_x, clearMem, assign_dimvelflucts
 from geometry3d import get_all_distances
 import time
 
 # helper function to calculate the Static Correlation Function
 def calculate_stat_corr(N, L, dt, startingTime, maxT, kValues, folder):
-    fName = "N{0}L{1:.1f}dt{2}T{3}_particles.txt".format(N, L, dt, maxT)
+    fName = "N{0}L{1:.1f}dt{2}T{3}".format(N, L, dt, maxT)
     fDir = os.path.join('particles', folder)
     
     for file in os.listdir(fDir):
@@ -85,19 +85,21 @@ def calculate_spattemp_corr(N, L, dt, startingTime, maxT, timeLength, kValue, fo
             # and load data for current t0
             tZeroPlusOnePos = positions[ ind+N*grain : ind+N+N*grain ] 
             time_zero(tZeroPos, tZeroPlusOnePos, t0, L)
-            t0 += 1
-            
+
             ind = (timeI+index*grain)*(N)
             prevPos = positions[ ind : ind+N ] 
             currentPos = positions[ ind+N*grain : ind+N+N*grain ] 
-            timeI += 1
-            absTime += 1
             
             if(len(currentPos)<N):
                 break
             
+            assign_dimvelflucts(tZeroPos, tZeroPlusOnePos, prevPos, currentPos, L, t0, (timeI+index*grain))
+            
             spattempCorr[index, 1] += spattemp_correlation(prevPos, currentPos, kValue, L, (timeI+index*grain) ) 
             count += 1
+            t0 += 1
+            timeI += 1
+            absTime += 1
             
         print(count)
         spattempCorr[index, 1] /= count

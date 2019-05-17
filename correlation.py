@@ -12,34 +12,36 @@ particles_t0 = []
 prevPos_t0 = []
 time0 = 0
 
-allDeltaVs_t0 = [[None]]*20000
-allDeltaVs = [[None]]*200000
+allDeltaVs_t0 = [None]*20000
+allDeltaVs = [None]*20000
 
 # calculate the dimensionless velocity fluctuations used in corr calculations
 def dim_vel_fluctuations(particlesT, particlesT_1, box_size):
     
     # without taking into account swarm rotation and dilation:
     
-#    vecs = subtract_with_PB(particlesT, particlesT_1, box_size)
-#    MV = np.mean(vecs, axis=0)
-#    print(MV)
-#    velFluct1 = np.subtract(vecs, MV)
-#    sqAvgVelFluct1 = np.einsum('ij,ij->i', velFluct1, velFluct1)
-#    sqAvgVelFluct1 = np.mean(sqAvgVelFluct1)
-#    dimVelFluct1 = velFluct1 / np.sqrt(sqAvgVelFluct1)
+    vecs = subtract_with_PB(particlesT, particlesT_1, box_size)
+    MV = np.mean(vecs, axis=0)
+    velFluct1 = np.subtract(vecs, MV)
+    sqAvgVelFluct1 = np.einsum('ij,ij->i', velFluct1, velFluct1)
+    sqAvgVelFluct1 = np.mean(sqAvgVelFluct1)
+    dimVelFluct1 = velFluct1 / np.sqrt(sqAvgVelFluct1)
     
     # using a Procrustes algorithm to take into account swarm rotation and dilation:
 
-    pT = unravel_pbc(particlesT_1, particlesT, box_size)
-    rsmd, proT, matrix = procrustes(particlesT_1, pT, box_size, reflection=False)
-    vecs = np.subtract(proT, particlesT_1)
-    avgVec = np.mean(vecs, axis=0)
-    velFluct = np.subtract(vecs, avgVec)
-    sqAvgVelFluct = np.einsum('ij,ij->i', velFluct, velFluct)
-    sqAvgVelFluct = np.mean(sqAvgVelFluct)
-    dimVelFluct = velFluct / np.sqrt(sqAvgVelFluct)
+#    pT = unravel_pbc(particlesT_1, particlesT, box_size)
+#    pTCM, cM = coords_wrt_centre_mass(pT, box_size, bounded=False)
+#    pT_1CM, cM_1 = coords_wrt_centre_mass(particlesT_1, box_size, bounded=False)
+#    rsmd, proT, matrix = procrustes(pT_1CM, pTCM, box_size, reflection=False)
+#    velFluct = np.subtract(proT, pT_1CM)
+#    avgVec = np.mean(vecs, axis=0)
+##    velFluct = np.subtract(vecs, avgVec)
+#    sqAvgVelFluct = np.einsum('ij,ij->i', velFluct, velFluct)
+#    sqAvgVelFluct = np.mean(sqAvgVelFluct)
+#    dimVelFluct = velFluct / np.sqrt(sqAvgVelFluct)
     
-    return dimVelFluct
+    
+    return dimVelFluct1
 
 def procrustes(X, Y, box_size, scaling=True, reflection='best'):
     """
@@ -87,17 +89,17 @@ def procrustes(X, Y, box_size, scaling=True, reflection='best'):
     n,m = X.shape
     ny,my = Y.shape
 
-#    muX = X.mean(0)
-#    muY = Y.mean(0)
-#
-#    X0 = X - muX
-#    Y0 = Y - muY
+    muX = X.mean(0)
+    muY = Y.mean(0)
+
+    X0 = X - muX
+    Y0 = Y - muY
     
     # a funky centre of mass calculation, required by periodic boundary conditions
-    X0, muX = coords_wrt_centre_mass(X, box_size, bounded=False)
-    Y0t, muYt = coords_wrt_centre_mass(Y, box_size, bounded=False)
-    muY = unravel_pbc(np.asarray([muX]), np.asarray([muYt]), box_size)[0]
-    Y0 = Y - muY
+#    X0, muX = coords_wrt_centre_mass(X, box_size, bounded=False)
+#    Y0t, muYt = coords_wrt_centre_mass(Y, box_size, bounded=False)
+#    muY = unravel_pbc(np.asarray([muX]), np.asarray([muYt]), box_size)[0]
+#    Y0 = Y - muY
 
     ssX = (X0**2.).sum()
     ssY = (Y0**2.).sum()
@@ -163,7 +165,7 @@ def procrustes(X, Y, box_size, scaling=True, reflection='best'):
 @jit(nopython=True)
 def unravel_pbc(ps1, ps2, box_size):
     m, n = ps1.shape
-    res = ps2
+    res = ps2.copy()
     
     for i in range(m):
         for j in range(n):
@@ -300,21 +302,38 @@ def time_zero(prevPos, particles, t, box_size):
     particles_t0 = particles.copy()
     prevPos_t0 = prevPos.copy()
     
+# check if dimentional velocity fluctiuations for given particle positions
+    # already exist in the lookup table, and add them if not
+def assign_dimvelflucts(prevPs_t0, ps_t0, prevPs, ps, box_size, t0, tI):
+    
+    if allDeltaVs_t0[t0] is None:
+        allDeltaVs_t0[t0] = dim_vel_fluctuations(ps_t0, prevPs_t0, box_size)
+    if allDeltaVs[tI] is None:
+        allDeltaVs[tI] = dim_vel_fluctuations(ps, prevPs, box_size)
+
+    
 def spattemp_correlation(prevPos, particles, k, box_size, timeI): 
     global particles_t0, prevPos_t0, time0, allDeltaVs_t0, allDeltaVs
     
     N = len(particles)
     
-    # check if dimentional velocity fluctiuations for given particle positions
-    # already exist in the lookup table
-    if allDeltaVs_t0[time0][0] is None:
-        allDeltaVs_t0[time0] = dim_vel_fluctuations(particles_t0, prevPos_t0, box_size)
-    if allDeltaVs[timeI][0] is None:
-        allDeltaVs[timeI] = dim_vel_fluctuations(particles, prevPos, box_size)
-        
     deltaV_t0 = allDeltaVs_t0[time0]
     deltaV = allDeltaVs[timeI]
     r_ij = distance_touple(prevPos_t0, prevPos, box_size)
+    
+#    test_t0 = dim_vel_fluctuations(particles_t0, prevPos_t0, box_size)
+#    test = dim_vel_fluctuations(particles, prevPos, box_size)
+#    
+#    equiv1 = np.array_equiv(deltaV_t0, test_t0)
+#    equiv2 = np.array_equiv(deltaV, test)
+#    if equiv1 is False or equiv2 is False:
+#        print(time0, timeI, equiv1, equiv2)
+#        print('=========')
+#        if equiv1 is False:
+#            print(deltaV_t0, test_t0)
+#        else:
+#            print(deltaV, test)
+#        print('='*20)
     
     #r_ij = remove_diagonal(r_ij)
     
@@ -338,8 +357,8 @@ def clearMem():
     particles_t0 = []
     prevPos_t0 = []
     time0 = 0
-    allDeltaVs_t0 = [[None]]*20000
-    allDeltaVs = [[None]]*200000
+    allDeltaVs_t0 = [None]*20000
+    allDeltaVs = [None]*20000
     
 # removes diagonal elements of an array, in case i=/=j is important
 def remove_diagonal(A):
